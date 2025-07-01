@@ -12,7 +12,7 @@ import {SetHelper} from "@solarity/solidity-lib/libs/arrays/SetHelper.sol";
 import {PERCENTAGE_100} from "@solarity/solidity-lib/utils/Globals.sol";
 
 import {IRecoveryManager} from "./interfaces/IRecoveryManager.sol";
-import {IRecoveryStrategy} from "./interfaces/IRecoveryStrategy.sol";
+import {IRecoveryStrategy} from "./interfaces/strategies/IRecoveryStrategy.sol";
 
 import {StrategiesModule} from "./modules/StrategiesModule.sol";
 import {SubscriptionModule} from "./modules/SubscriptionModule.sol";

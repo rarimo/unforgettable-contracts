@@ -4,56 +4,42 @@ pragma solidity ^0.8.28;
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 import {IRecoveryProvider} from "./IRecoveryProvider.sol";
+import {IStrategiesModule} from "./modules/IStrategiesModule.sol";
+import {ISubscriptionModule} from "./modules/ISubscriptionModule.sol";
+import {ITokensPriceModule} from "./modules/ITokensPriceModule.sol";
+import {ITokensWhitelistModule} from "./modules/ITokensWhitelistModule.sol";
 
-interface IRecoveryManager is IRecoveryProvider {
-    enum StrategyStatus {
-        None,
-        Active,
-        Disabled
+interface IRecoveryManager is
+    IRecoveryProvider,
+    IStrategiesModule,
+    ISubscriptionModule,
+    ITokensWhitelistModule
+{
+    struct NewSubscriptionData {
+        address tokenAddr;
+        uint256 subscriptionDuration;
+        uint256 recoverySecurityPercentage;
+        RecoveryMethod[] recoveryMethods;
     }
 
-    struct NewSubscriptionPeriodInfo {
+    // struct AccountRecoveryData {
+    //     uint256 subscriptionId;
+    //     uint256[] recoveryMethodIds;
+    //     bytes[] proofs;
+    // }
+
+    struct AccountRecoveryData {
+        uint256 recoverySecurityPercentage;
+        RecoveryMethod[] recoveryMethods;
+    }
+
+    struct SubscriptionPeriodUpdateEntry {
         uint256 duration;
         uint256 strategiesCostFactor;
     }
 
     struct NewStrategyInfo {
-        uint256 recoveryCostInUsd;
+        uint256 baseRecoveryCostInUsd;
         address strategy;
     }
-
-    struct SubscriptionPeriodData {
-        uint256 strategiesCostFactor;
-    }
-
-    struct StrategyData {
-        uint256 recoveryCostInUsd;
-        address strategy;
-        StrategyStatus status;
-    }
-
-    struct SubscribeData {
-        uint256 recoverSecurityPercentage;
-        RecoveryMethod[] recoveryMethods;
-    }
-
-    struct RecoveryMethod {
-        uint256 strategyId;
-        bytes recoveryData;
-    }
-
-    struct AccountRecoverySettings {
-        uint256 recoverSecurityPercentage;
-        uint256 nextRecoveryMethodId;
-        EnumerableSet.UintSet activeRecoveryMethodIds;
-        mapping(uint256 => RecoveryMethod) recoveryMethods;
-    }
-
-    event RecoverySecurityPercentageChanged(
-        address indexed account,
-        uint256 newRecoverySecurityPercentage
-    );
-    event NewRecoveryMethodAdded(address indexed account, uint256 indexed recoveryMethodId);
-    event RecoveryMethodChanged(address indexed account, uint256 indexed recoveryMethodId);
-    event RecoveryMethodRemoved(address indexed account, uint256 indexed recoveryMethodId);
 }

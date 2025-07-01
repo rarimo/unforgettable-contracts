@@ -13,291 +13,367 @@ import {PERCENTAGE_100} from "@solarity/solidity-lib/utils/Globals.sol";
 
 import {IRecoveryManager} from "./interfaces/IRecoveryManager.sol";
 import {IRecoveryStrategy} from "./interfaces/IRecoveryStrategy.sol";
-import {IPriceManager} from "./interfaces/IPriceManager.sol";
 
-contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
+import {StrategiesModule} from "./modules/StrategiesModule.sol";
+import {SubscriptionModule} from "./modules/SubscriptionModule.sol";
+import {TokensPriceModule} from "./modules/TokensPriceModule.sol";
+import {TokensWhitelistModule} from "./modules/TokensWhitelistModule.sol";
+
+contract RecoveryManager is
+    IRecoveryManager,
+    OwnableUpgradeable,
+    StrategiesModule,
+    SubscriptionModule,
+    TokensWhitelistModule
+{
     using EnumerableSet for *;
     using SetHelper for *;
     using SafeERC20 for IERC20;
 
-    address public constant ETH_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    bytes32 public constant RECOVERY_MANAGER_STORAGE_SLOT =
+        keccak256("unforgettable.contract.recovery.manager.storage");
 
-    IPriceManager internal _priceManager;
-
-    uint256 internal _nextStrategyId;
-
-    EnumerableSet.AddressSet internal _whitelistedTokens;
-    EnumerableSet.UintSet internal _activeSubscriptionPeriods;
-
-    struct AccountSubscriptionData {
-        uint64 startTime;
-        uint64 endTime;
+    struct RecoveryManagerStorage {
+        mapping(address => bool) subscribedAccounts;
     }
 
-    mapping(address => AccountSubscriptionData) internal _accountsSubscription;
-    mapping(address => AccountRecoverySettings) internal _accountsRecoverySettings;
+    error AccountAlreadySubscribed(address account);
+    error AccountNotSubscribed(address account);
+    error UnableToPayWithNativeCurrency();
+    error NotAuthorizedForSubscription(address account, uint256 subscriptionId);
+    error SubscriptionEnded(uint256 subscriptionId_);
 
-    mapping(uint256 => SubscriptionPeriodData) internal _subscriptionPeriodsData;
-    mapping(uint256 => StrategyData) internal _strategiesData;
+    event SubscriptionBought(
+        address indexed account,
+        uint256 subscriptionId,
+        uint256 duration,
+        address tokenAddr,
+        uint256 tokensAmount
+    );
 
-    modifier hasRecoveryMethods() {
+    modifier onlySubscribedAccount() {
+        _onlySubscribedAccount(msg.sender);
         _;
-        _hasRecoveryMethods(msg.sender);
     }
 
-    function initialize(address priceManager_) external initializer {
+    modifier onlyAccountSubscription(uint256 subscriptionId_) {
+        _onlyAccountSubscription(msg.sender, subscriptionId_);
+        _;
+    }
+
+    function _getRecoveryManagerStorage()
+        private
+        pure
+        returns (RecoveryManagerStorage storage _rms)
+    {
+        bytes32 slot_ = RECOVERY_MANAGER_STORAGE_SLOT;
+
+        assembly {
+            _rms.slot := slot_
+        }
+    }
+
+    function initialize(address priceManager_, uint64 basePeriodDuration_) external initializer {
         __Ownable_init(msg.sender);
 
-        _priceManager = IPriceManager(priceManager_);
+        _setPriceManager(priceManager_);
+        _setBasePeriodDuration(basePeriodDuration_);
     }
+
+    /**********************************************************************************************/
+    /*** `Whitelist` management                                                                 ***/
+    /**********************************************************************************************/
 
     function updateWhitelistedTokens(
         address[] calldata tokensToUpdate_,
         bool isAdding_
     ) external onlyOwner {
         if (isAdding_) {
-            for (uint256 i = 0; i < tokensToUpdate_.length; i++) {
-                require(_priceManager.isTokenSupported(tokensToUpdate_[i]));
-            }
-
-            _whitelistedTokens.add(tokensToUpdate_);
+            _addTokensToWhitelist(tokensToUpdate_);
         } else {
-            _whitelistedTokens.remove(tokensToUpdate_);
+            _removeTokensFromWhitelist(tokensToUpdate_);
         }
     }
 
+    /**********************************************************************************************/
+    /*** `Subscription Periods` management                                                      ***/
+    /**********************************************************************************************/
+
     function updateSubscriptionPeriods(
-        NewSubscriptionPeriodInfo[] calldata newSubscriptionPeriodsInfo_
+        SubscriptionPeriodUpdateEntry[] calldata subscriptionPeriodUpdateEntries_
     ) external onlyOwner {
-        for (uint256 i = 0; i < newSubscriptionPeriodsInfo_.length; i++) {
-            NewSubscriptionPeriodInfo calldata currentPeriod_ = newSubscriptionPeriodsInfo_[i];
-
-            _subscriptionPeriodsData[currentPeriod_.duration] = SubscriptionPeriodData({
-                strategiesCostFactor: currentPeriod_.strategiesCostFactor
-            });
-
-            _activeSubscriptionPeriods.add(currentPeriod_.duration);
+        for (uint256 i = 0; i < subscriptionPeriodUpdateEntries_.length; i++) {
+            _updateSubscriptionPeriod(
+                uint64(subscriptionPeriodUpdateEntries_[i].duration),
+                subscriptionPeriodUpdateEntries_[i].strategiesCostFactor
+            );
         }
     }
 
     function removeSubscriptionPeriods(uint256[] calldata periodsToRemove_) external onlyOwner {
-        _activeSubscriptionPeriods.remove(periodsToRemove_);
+        for (uint256 i = 0; i < periodsToRemove_.length; i++) {
+            _removeSubscriptionPeriod(uint64(periodsToRemove_[i]));
+        }
     }
+
+    /**********************************************************************************************/
+    /*** `Strategies` management                                                                ***/
+    /**********************************************************************************************/
 
     function addRecoveryStrategies(NewStrategyInfo[] calldata newStrategies_) external onlyOwner {
         for (uint256 i = 0; i < newStrategies_.length; i++) {
-            require(newStrategies_[i].strategy != address(0));
-
-            _strategiesData[_nextStrategyId++] = StrategyData({
-                recoveryCostInUsd: newStrategies_[i].recoveryCostInUsd,
-                strategy: newStrategies_[i].strategy,
-                status: StrategyStatus.Active
-            });
+            _addStrategy(newStrategies_[i].strategy, newStrategies_[i].baseRecoveryCostInUsd);
         }
     }
 
     function disableStrategy(uint256 strategyId_) external onlyOwner {
-        require(isActiveStrategy(strategyId_));
-
-        _strategiesData[strategyId_].status = StrategyStatus.Disabled;
+        _disableStrategy(strategyId_);
     }
 
     function enableStrategy(uint256 strategyId_) external onlyOwner {
-        require(_strategiesData[strategyId_].status == StrategyStatus.Disabled);
-
-        _strategiesData[strategyId_].status = StrategyStatus.Active;
+        _enableStrategy(strategyId_);
     }
 
+    /**********************************************************************************************/
+    /*** `Tokens Withdrawals` management                                                        ***/
+    /**********************************************************************************************/
+
     function withdrawTokens(address tokenAddr_, address recipient_) external onlyOwner {
-        if (tokenAddr_ != ETH_ADDR) {
+        if (!isNativeToken(tokenAddr_)) {
             _transferERC20Tokens(tokenAddr_, address(this), recipient_, type(uint256).max);
         } else {
             Address.sendValue(payable(recipient_), address(this).balance);
         }
     }
 
-    function buyRecoverySubscription(
-        address account_,
-        uint256 subscriptionDuration_,
+    /**********************************************************************************************/
+    /*** `IRecoveryProvider` logic                                                              ***/
+    /**********************************************************************************************/
+
+    function subscribe(bytes memory subscribeDataRaw_) external {
+        require(!isAccountSubscribed(msg.sender), AccountAlreadySubscribed(msg.sender));
+
+        NewSubscriptionData memory subscribeData_ = abi.decode(
+            subscribeDataRaw_,
+            (NewSubscriptionData)
+        );
+
+        if (subscribeData_.recoveryMethods.length > 0) {
+            require(!isNativeToken(subscribeData_.tokenAddr), UnableToPayWithNativeCurrency());
+
+            _buyNewSubscription(subscribeData_);
+        } else {
+            _hasActiveSubscription(msg.sender);
+        }
+
+        _getRecoveryManagerStorage().subscribedAccounts[msg.sender] = true;
+
+        emit AccountSubscribed(msg.sender);
+    }
+
+    function unsubscribe() external onlySubscribedAccount {
+        delete _getRecoveryManagerStorage().subscribedAccounts[msg.sender];
+
+        emit AccountUnsubscribed(msg.sender);
+    }
+
+    function recover(
+        address newOwner_,
+        bytes calldata recoveryProof_
+    ) external onlySubscribedAccount {
+        _hasActiveSubscription(msg.sender);
+
+        uint256 currentSubscriptionId_ = getCurrentAccountSubscriptionId(msg.sender);
+    }
+
+    function getRecoveryData(address account_) external view returns (bytes memory) {
+        uint256 subscriptionId_ = getCurrentAccountSubscriptionId(account_);
+
+        require(subscriptionId_ > 0, NoActiveSubscription(account_));
+
+        AccountRecoveryData memory recoveryData_ = AccountRecoveryData({
+            recoverySecurityPercentage: getSubscriptionRecoverySecurityPercentage(subscriptionId_),
+            recoveryMethods: getSubscriptionActiveRecoveryMethods(subscriptionId_)
+        });
+
+        return abi.encode(recoveryData_);
+    }
+
+    /**********************************************************************************************/
+    /*** `Account Subscriptions` management                                                     ***/
+    /**********************************************************************************************/
+
+    function buyNewSubscription(
+        NewSubscriptionData calldata subscriptionData_
+    ) external payable onlySubscribedAccount {
+        _buyNewSubscription(subscriptionData_);
+    }
+
+    function extendSubscription(
+        uint256 subscriptionId_,
+        uint256 duration_,
         address tokenAddr_
     ) external payable {
-        _hasRecoveryMethods(account_);
-        require(subscriptionPeriodExists(subscriptionDuration_));
-        _priceManager.isTokenSupported(tokenAddr_);
+        _onlyWhitelistedToken(tokenAddr_);
 
-        uint256 amountToPayInUsd_ = getSubscriptionCost(account_, subscriptionDuration_);
+        _extendSubscription(subscriptionId_, duration_);
 
-        uint256 tokensAmount_ = _priceManager.getAmountFromUsd(tokenAddr_, amountToPayInUsd_);
+        uint256 extensionCostInUsd_ = getSubscriptionExtensionCostInUsd(
+            duration_,
+            subscriptionId_
+        );
+        uint256 extensionCostInTokens_ = getAmountFromUsd(tokenAddr_, extensionCostInUsd_);
 
-        if (tokenAddr_ != ETH_ADDR) {
+        if (!isNativeToken(tokenAddr_)) {
+            _transferERC20Tokens(tokenAddr_, msg.sender, address(this), extensionCostInTokens_);
+        } else {
+            _receiveNative(msg.sender, extensionCostInTokens_);
+        }
+    }
+
+    function addRecoveryMethod(
+        uint256 subscriptionId_,
+        address tokenAddr_,
+        RecoveryMethod calldata newRecoveryMethod_
+    ) external payable onlySubscribedAccount onlyAccountSubscription(subscriptionId_) {
+        _validateRecoveryMethod(newRecoveryMethod_);
+
+        _addRecoveryMethod(subscriptionId_, newRecoveryMethod_);
+
+        uint256 leftPeriodsInSubscription_ = getLeftPeriodsInSubscription(subscriptionId_);
+
+        require(leftPeriodsInSubscription_ > 0, SubscriptionEnded(subscriptionId_));
+
+        uint256 costInUsd_ = getRecoveryCostInUsdByPeriods(
+            newRecoveryMethod_.strategyId,
+            leftPeriodsInSubscription_
+        );
+        uint256 tokensAmount_ = getAmountFromUsd(tokenAddr_, costInUsd_);
+
+        if (!isNativeToken(tokenAddr_)) {
             _transferERC20Tokens(tokenAddr_, msg.sender, address(this), tokensAmount_);
         } else {
             _receiveNative(msg.sender, tokensAmount_);
         }
     }
 
-    function changeRecoverySecurityPercentage(uint256 newRecoverySecurityPercentage_) external {
-        _setRecoverySecurityPercentage(msg.sender, newRecoverySecurityPercentage_);
+    function removeRecoveryMethod(
+        uint256 subscriptionId_,
+        uint256 recoveryMethodId_
+    ) external onlySubscribedAccount onlyAccountSubscription(subscriptionId_) {
+        _removeRecoveryMethod(subscriptionId_, recoveryMethodId_);
     }
 
-    function changeRecoveryMethod(
+    function changeRecoverySecurityPercentage(
+        uint256 subscriptionId_,
+        uint256 newRecoverySecurityPercentage_
+    ) external onlySubscribedAccount onlyAccountSubscription(subscriptionId_) {
+        _changeRecoverySecurityPercentage(subscriptionId_, newRecoverySecurityPercentage_);
+    }
+
+    function changeRecoveryData(
+        uint256 subscriptionId_,
         uint256 recoveryMethodId_,
-        RecoveryMethod memory newMethodData_
-    ) external {
-        AccountRecoverySettings storage _recoverySettings = _accountsRecoverySettings[msg.sender];
+        bytes calldata newRecoveryData_
+    ) external onlySubscribedAccount onlyAccountSubscription(subscriptionId_) {
+        RecoveryMethod memory recoveryMethod_ = getActiveRecoveryMethod(
+            subscriptionId_,
+            recoveryMethodId_
+        );
 
-        _hasActiveRecoveryMethod(msg.sender, recoveryMethodId_);
+        IRecoveryStrategy(getStrategy(recoveryMethod_.strategyId)).validateAccountRecoveryData(
+            newRecoveryData_
+        );
 
-        _validateRecoveryMethod(newMethodData_);
-
-        _recoverySettings.recoveryMethods[recoveryMethodId_] = newMethodData_;
-
-        emit RecoveryMethodChanged(msg.sender, recoveryMethodId_);
+        _changeRecoveryData(subscriptionId_, recoveryMethodId_, newRecoveryData_);
     }
 
-    function removeRecoveryMethods(
-        uint256[] calldata methodIdsToRemove_
-    ) external hasRecoveryMethods {
-        for (uint256 i = 0; i < methodIdsToRemove_.length; i++) {
-            _removeRecoveryMethod(msg.sender, methodIdsToRemove_[i]);
-        }
-    }
+    /**********************************************************************************************/
+    /*** Getters                                                                                ***/
+    /**********************************************************************************************/
 
-    function removeRecoveryMethod(uint256 methodIdToRemove_) external hasRecoveryMethods {
-        _removeRecoveryMethod(msg.sender, methodIdToRemove_);
-    }
-
-    function subscribe(bytes memory subscribeDataRaw_) external hasRecoveryMethods {
-        SubscribeData memory subscribeData_ = abi.decode(subscribeDataRaw_, (SubscribeData));
-
-        _setRecoverySecurityPercentage(msg.sender, subscribeData_.recoverSecurityPercentage);
-
-        for (uint256 i = 0; i < subscribeData_.recoveryMethods.length; i++) {
-            _addRecoveryMethod(msg.sender, subscribeData_.recoveryMethods[i]);
-        }
-
-        emit AccountSubscribed(msg.sender);
-    }
-
-    function unsubscribe() external {
-        delete _accountsRecoverySettings[msg.sender];
-
-        emit AccountUnsubscribed(msg.sender);
-    }
-
-    function recover(address newOwner_, bytes memory proof_) external {}
-
-    function getRecoveryData(address account_) external view returns (bytes memory) {
-        AccountRecoverySettings storage _recoverySettings = _accountsRecoverySettings[account_];
-
-        uint256 activeRecoveryMethodsCount_ = _recoverySettings.activeRecoveryMethodIds.length();
-
-        SubscribeData memory subscribeData_ = SubscribeData({
-            recoverSecurityPercentage: _recoverySettings.recoverSecurityPercentage,
-            recoveryMethods: new RecoveryMethod[](activeRecoveryMethodsCount_)
-        });
-
-        for (uint256 i = 0; i < activeRecoveryMethodsCount_; i++) {
-            subscribeData_.recoveryMethods[i] = _recoverySettings.recoveryMethods[
-                _recoverySettings.activeRecoveryMethodIds.at(i)
-            ];
-        }
-
-        return abi.encode(subscribeData_);
-    }
-
-    function getSubscriptionCost(
-        address account_,
-        uint256 subscriptionDuration_
+    function getSubscriptionExtensionCostInUsd(
+        uint256 subscriptionId_,
+        uint256 duration_
     ) public view returns (uint256) {
-        if (!subscriptionPeriodExists(subscriptionDuration_)) {
-            return 0;
+        return
+            getSubscriptionCostInUsd(
+                duration_,
+                getSubscriptionActiveRecoveryMethods(subscriptionId_)
+            );
+    }
+
+    function getSubscriptionCostInUsd(
+        uint256 duration_,
+        RecoveryMethod[] memory recoveryMethods_
+    ) public view returns (uint256) {
+        uint256 basePeriodsCount_ = getPeriodsCountByTime(duration_);
+
+        uint256 totalBaseCostInUsd_;
+        for (uint256 i = 0; i < recoveryMethods_.length; i++) {
+            totalBaseCostInUsd_ += getRecoveryCostInUsdByPeriods(
+                recoveryMethods_[i].strategyId,
+                basePeriodsCount_
+            );
         }
 
         return
             Math.mulDiv(
-                getBaseSubscriptionCost(account_),
-                _subscriptionPeriodsData[subscriptionDuration_].strategiesCostFactor,
+                totalBaseCostInUsd_,
+                getSubscriptionPeriodFactor(duration_),
                 PERCENTAGE_100
             );
     }
 
-    function getBaseSubscriptionCost(address account_) public view returns (uint256 totalCost_) {
-        AccountRecoverySettings storage _recoverySettings = _accountsRecoverySettings[account_];
+    function isAccountSubscribed(address account_) public view returns (bool) {
+        return _getRecoveryManagerStorage().subscribedAccounts[account_];
+    }
 
-        uint256 recoveryMethodsCount_ = getAccountRecoveryMethodsCount(account_);
+    /**********************************************************************************************/
+    /*** Internal helper functions                                                              ***/
+    /**********************************************************************************************/
 
-        for (uint256 i = 0; i < recoveryMethodsCount_; i++) {
-            uint256 recoveryMethodId_ = _recoverySettings.activeRecoveryMethodIds.at(i);
+    function _buyNewSubscription(NewSubscriptionData memory subscriptionData_) internal {
+        _onlyWhitelistedToken(subscriptionData_.tokenAddr);
 
-            totalCost_ += getStrategyRecoveryCostInUsd(
-                _recoverySettings.recoveryMethods[recoveryMethodId_].strategyId
-            );
+        for (uint256 i = 0; i < subscriptionData_.recoveryMethods.length; i++) {
+            _validateRecoveryMethod(subscriptionData_.recoveryMethods[i]);
         }
-    }
 
-    function getStrategyRecoveryCostInUsd(uint256 strategyId_) public view returns (uint256) {
-        return _strategiesData[strategyId_].recoveryCostInUsd;
-    }
-
-    function getAccountRecoveryMethodsCount(address account_) public view returns (uint256) {
-        return _accountsRecoverySettings[account_].activeRecoveryMethodIds.length();
-    }
-
-    function subscriptionPeriodExists(uint256 duration_) public view returns (bool) {
-        return _activeSubscriptionPeriods.contains(duration_);
-    }
-
-    function isActiveStrategy(uint256 strategyId_) public view returns (bool) {
-        return _strategiesData[strategyId_].status == StrategyStatus.Active;
-    }
-
-    function isActiveRecoveryMethod(
-        address account_,
-        uint256 recoveryMethodId_
-    ) public view returns (bool) {
-        return
-            _accountsRecoverySettings[account_].activeRecoveryMethodIds.contains(
-                recoveryMethodId_
-            );
-    }
-
-    function _setRecoverySecurityPercentage(
-        address account_,
-        uint256 newRecoverySecurityPercentage_
-    ) internal {
-        require(
-            newRecoverySecurityPercentage_ > 0 && newRecoverySecurityPercentage_ <= PERCENTAGE_100
+        uint256 subscriptionId_ = _createNewSubscription(
+            msg.sender,
+            subscriptionData_.subscriptionDuration,
+            subscriptionData_.recoverySecurityPercentage,
+            subscriptionData_.recoveryMethods
         );
 
-        _accountsRecoverySettings[account_]
-            .recoverSecurityPercentage = newRecoverySecurityPercentage_;
+        uint256 subscriptionCostInUsd_ = getSubscriptionCostInUsd(
+            subscriptionData_.subscriptionDuration,
+            subscriptionData_.recoveryMethods
+        );
+        uint256 subscriptionCostInTokens_ = getAmountFromUsd(
+            subscriptionData_.tokenAddr,
+            subscriptionCostInUsd_
+        );
 
-        emit RecoverySecurityPercentageChanged(account_, newRecoverySecurityPercentage_);
-    }
+        if (!isNativeToken(subscriptionData_.tokenAddr)) {
+            _transferERC20Tokens(
+                subscriptionData_.tokenAddr,
+                msg.sender,
+                address(this),
+                subscriptionCostInTokens_
+            );
+        } else {
+            _receiveNative(msg.sender, subscriptionCostInTokens_);
+        }
 
-    function _addRecoveryMethod(address account_, RecoveryMethod memory recoveryMethod_) internal {
-        _validateRecoveryMethod(recoveryMethod_);
-
-        AccountRecoverySettings storage _recoverySettings = _accountsRecoverySettings[account_];
-
-        uint256 newMethodId_ = _recoverySettings.nextRecoveryMethodId++;
-
-        _recoverySettings.activeRecoveryMethodIds.add(newMethodId_);
-        _recoverySettings.recoveryMethods[newMethodId_] = recoveryMethod_;
-
-        emit NewRecoveryMethodAdded(account_, newMethodId_);
-    }
-
-    function _removeRecoveryMethod(address account_, uint256 methodId_) internal {
-        AccountRecoverySettings storage _recoverySettings = _accountsRecoverySettings[account_];
-
-        _hasActiveRecoveryMethod(account_, methodId_);
-
-        _recoverySettings.activeRecoveryMethodIds.remove(methodId_);
-        delete _recoverySettings.recoveryMethods[methodId_];
-
-        emit RecoveryMethodRemoved(account_, methodId_);
+        emit SubscriptionBought(
+            msg.sender,
+            subscriptionId_,
+            subscriptionData_.subscriptionDuration,
+            subscriptionData_.tokenAddr,
+            subscriptionCostInTokens_
+        );
     }
 
     function _transferERC20Tokens(
@@ -325,17 +401,21 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
     }
 
     function _validateRecoveryMethod(RecoveryMethod memory recoveryMethod_) internal view {
-        require(isActiveStrategy(recoveryMethod_.strategyId));
+        _hasStrategyStatus(recoveryMethod_.strategyId, StrategyStatus.Active);
 
-        IRecoveryStrategy(_strategiesData[recoveryMethod_.strategyId].strategy)
-            .validateAccountRecoveryData(recoveryMethod_.recoveryData);
+        IRecoveryStrategy(getStrategy(recoveryMethod_.strategyId)).validateAccountRecoveryData(
+            recoveryMethod_.recoveryData
+        );
     }
 
-    function _hasActiveRecoveryMethod(address account_, uint256 recoveryMethodId_) internal view {
-        require(isActiveRecoveryMethod(account_, recoveryMethodId_));
+    function _onlySubscribedAccount(address account_) internal view {
+        require(isAccountSubscribed(account_), AccountNotSubscribed(account_));
     }
 
-    function _hasRecoveryMethods(address account_) internal view {
-        require(_accountsRecoverySettings[account_].activeRecoveryMethodIds.length() > 0);
+    function _onlyAccountSubscription(address account_, uint256 subscriptionId_) internal view {
+        require(
+            getSubscriptionAccount(subscriptionId_) == account_,
+            NotAuthorizedForSubscription(account_, subscriptionId_)
+        );
     }
 }

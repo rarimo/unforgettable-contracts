@@ -51,7 +51,7 @@ contract TokensWhitelistModule is ITokensWhitelistModule, TokensPriceModule {
         TokensWhitelistModuleStorage storage $ = _getTokensWhitelistModuleStorage();
 
         for (uint256 i = 0; i < tokensToAdd_.length; i++) {
-            isTokenSupported(tokensToAdd_[i]);
+            _onlySupportedToken(tokensToAdd_[i]);
 
             $.whitelistedTokens.add(tokensToAdd_[i]);
         }

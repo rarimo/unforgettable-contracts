@@ -9,6 +9,15 @@ interface ISubscriptionModule {
         bytes recoveryData;
     }
 
+    struct SubscriptionInfo {
+        uint256 subscriptionId;
+        address account;
+        uint256 recoverySecurityPercentage;
+        uint64 startTime;
+        uint64 endTime;
+        RecoveryMethod[] activeRecoveryMethods;
+    }
+
     struct SubscriptionData {
         address account;
         uint256 recoverySecurityPercentage;
@@ -41,6 +50,7 @@ interface ISubscriptionModule {
     event SubscriptionPeriodRemoved(uint256 indexed duration);
 
     event RecoveryMethodAdded(uint256 indexed subscriptionId, uint256 recoveryMethodId);
+    event RecoveryMethodRemoved(uint256 indexed subscriptionId, uint256 recoveryMethodId);
     event RecoveryDataChanged(uint256 indexed subscriptionId, uint256 recoveryMethodId);
     event RecoverySecurityPercentageChanged(
         uint256 indexed subscriptionId,

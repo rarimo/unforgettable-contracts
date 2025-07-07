@@ -6,7 +6,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {PERCENTAGE_100} from "@solarity/solidity-lib/utils/Globals.sol";
 
-import {IRecoveryStrategy} from "../interfaces/IRecoveryStrategy.sol";
+import {IRecoveryStrategy} from "../interfaces/strategies/IRecoveryStrategy.sol";
 import {ISubscriptionModule} from "../interfaces/modules/ISubscriptionModule.sol";
 
 contract SubscriptionModule is ISubscriptionModule {
@@ -81,6 +81,23 @@ contract SubscriptionModule is ISubscriptionModule {
         }
     }
 
+    function getSubscriptionInfo(
+        uint256 subscriptionId_
+    ) public view returns (SubscriptionInfo memory) {
+        SubscriptionData storage subscriptionData = _getSubscriptionModuleStorage()
+            .subscriptionsData[subscriptionId_];
+
+        return
+            SubscriptionInfo({
+                subscriptionId: subscriptionId_,
+                account: subscriptionData.account,
+                recoverySecurityPercentage: subscriptionData.recoverySecurityPercentage,
+                startTime: subscriptionData.startTime,
+                endTime: subscriptionData.endTime,
+                activeRecoveryMethods: getSubscriptionActiveRecoveryMethods(subscriptionId_)
+            });
+    }
+
     function getAccountSubscriptionsEndTime(address account_) public view returns (uint256) {
         SubscriptionModuleStorage storage $ = _getSubscriptionModuleStorage();
 
@@ -120,7 +137,7 @@ contract SubscriptionModule is ISubscriptionModule {
 
             if (
                 $.subscriptionsData[subscriptionId_].startTime < block.timestamp &&
-                block.timestamp > $.subscriptionsData[subscriptionId_].endTime
+                block.timestamp < $.subscriptionsData[subscriptionId_].endTime
             ) {
                 break;
             }
@@ -304,6 +321,8 @@ contract SubscriptionModule is ISubscriptionModule {
             subscriptionData.activeRecoveryMethodIds.length() > 0,
             UnableToRemoveLastRecoveryMethod()
         );
+
+        emit RecoveryMethodRemoved(subscriptionId_, methodId_);
     }
 
     function _hasActiveSubscription(address account_) internal view {

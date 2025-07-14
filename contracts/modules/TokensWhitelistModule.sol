@@ -3,12 +3,9 @@ pragma solidity ^0.8.28;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import {IPriceManager} from "../interfaces/IPriceManager.sol";
 import {ITokensWhitelistModule} from "../interfaces/modules/ITokensWhitelistModule.sol";
 
-import {TokensPriceModule} from "./TokensPriceModule.sol";
-
-contract TokensWhitelistModule is ITokensWhitelistModule, TokensPriceModule {
+contract TokensWhitelistModule is ITokensWhitelistModule {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     bytes32 public constant TOKENS_WHITELIST_MODULE_STORAGE_SLOT =
@@ -51,8 +48,6 @@ contract TokensWhitelistModule is ITokensWhitelistModule, TokensPriceModule {
         TokensWhitelistModuleStorage storage $ = _getTokensWhitelistModuleStorage();
 
         for (uint256 i = 0; i < tokensToAdd_.length; i++) {
-            _onlySupportedToken(tokensToAdd_[i]);
-
             $.whitelistedTokens.add(tokensToAdd_[i]);
         }
 

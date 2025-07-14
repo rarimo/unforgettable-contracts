@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IPriceManager} from "../IPriceManager.sol";
-
 interface ITokensWhitelistModule {
     error NotAWhitelistedToken(address tokenAddr);
 

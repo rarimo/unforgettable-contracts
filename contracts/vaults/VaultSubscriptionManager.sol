@@ -62,6 +62,10 @@ contract VaultSubscriptionManager is
         _;
     }
 
+    constructor() {
+        _disableInitializers();
+    }
+
     function _getVaultSubscriptionManagerStorage()
         private
         pure
@@ -76,7 +80,6 @@ contract VaultSubscriptionManager is
 
     function initialize(
         uint64 basePeriodDuration_,
-        address vaultFactoryAddr_,
         address subscriptionSigner_,
         PaymentTokenUpdateEntry[] calldata paymentTokenEntries_,
         SBTTokenUpdateEntry[] calldata sbtTokenEntries_
@@ -86,10 +89,13 @@ contract VaultSubscriptionManager is
 
         _setBasePeriodDuration(basePeriodDuration_);
         _setSubscriptionSigner(subscriptionSigner_);
-        _getVaultSubscriptionManagerStorage().vaultFactory = IVaultFactory(vaultFactoryAddr_);
 
         _updatePaymentTokens(paymentTokenEntries_);
         _updateSBTTokens(sbtTokenEntries_);
+    }
+
+    function secondStepInitialize(address vaultFactoryAddr_) external reinitializer(2) onlyOwner {
+        _getVaultSubscriptionManagerStorage().vaultFactory = IVaultFactory(vaultFactoryAddr_);
     }
 
     function setSubscriptionSigner(address newSubscriptionSigner_) external onlyOwner {

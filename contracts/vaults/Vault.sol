@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
@@ -29,6 +28,10 @@ contract Vault is IVault, NoncesUpgradeable, EIP712Upgradeable {
         address masterKey;
         IVaultFactory vaultFactory;
         bool disabled;
+    }
+
+    constructor() {
+        _disableInitializers();
     }
 
     function _getVaultStorage() private pure returns (VaultStorage storage _vs) {

@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-
-import {IVaultFactory} from "./IVaultFactory.sol";
 import {ISubscriptionManager} from "../ISubscriptionManager.sol";
 
 interface IVaultSubscriptionManager is ISubscriptionManager {

@@ -39,6 +39,10 @@ contract VaultFactory is IVaultFactory, OwnableUpgradeable, UUPSUpgradeable, Non
         mapping(address => EnumerableSet.AddressSet) vaultsByCreator;
     }
 
+    constructor() {
+        _disableInitializers();
+    }
+
     function _getVaultFactoryStorage() private pure returns (VaultFactoryStorage storage _vfs) {
         bytes32 slot_ = VAULT_FACTORY_STORAGE_SLOT;
 
@@ -47,18 +51,16 @@ contract VaultFactory is IVaultFactory, OwnableUpgradeable, UUPSUpgradeable, Non
         }
     }
 
-    function initialize(
-        address vaultImplementation_,
-        address vaultSubscriptionManager_,
-        address initialOwner_
-    ) external initializer {
-        __Ownable_init(initialOwner_);
-
-        VaultFactoryStorage storage $ = _getVaultFactoryStorage();
+    function initialize(address vaultImplementation_) external initializer {
+        __Ownable_init(msg.sender);
 
         _updateVaultImplementation(vaultImplementation_);
+    }
 
-        $.vaultSubscriptionManager = vaultSubscriptionManager_;
+    function secondStepInitialize(
+        address vaultSubscriptionManager_
+    ) external reinitializer(2) onlyOwner {
+        _getVaultFactoryStorage().vaultSubscriptionManager = vaultSubscriptionManager_;
     }
 
     function updateVaultImplementation(address newVaultImpl_) external onlyOwner {

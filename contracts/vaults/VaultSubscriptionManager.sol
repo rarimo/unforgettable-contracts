@@ -2,28 +2,63 @@
 pragma solidity ^0.8.28;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
 import {PERCENTAGE_100} from "@solarity/solidity-lib/utils/Globals.sol";
 
+import {IBurnableSBT} from "../interfaces/tokens/IBurnableSBT.sol";
 import {IVaultFactory} from "../interfaces/vaults/IVaultFactory.sol";
 import {IVaultSubscriptionManager} from "../interfaces/vaults/IVaultSubscriptionManager.sol";
 
-contract VaultSubscriptionManager is IVaultSubscriptionManager, OwnableUpgradeable {
-    using EnumerableSet for *;
-    using SafeERC20 for IERC20;
+import {TokensHelper} from "../libs/TokensHelper.sol";
+import {EIP712SignatureChecker} from "../libs/EIP712SignatureChecker.sol";
 
-    address public constant ETH_ADDR = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+contract VaultSubscriptionManager is
+    IVaultSubscriptionManager,
+    OwnableUpgradeable,
+    NoncesUpgradeable,
+    EIP712Upgradeable
+{
+    using EnumerableSet for *;
+    using TokensHelper for address;
+    using EIP712SignatureChecker for address;
+
+    bytes32 public constant BUY_SUBSCRIPTION_TYPEHASH =
+        keccak256("BuySubscription(address sender,uint64 duration,uint256 nonce)");
 
     bytes32 public constant VAULT_SUBSCRIPTION_MANAGER_STORAGE_SLOT =
         keccak256("unforgettable.contract.vault.subscription.manager.storage");
 
+    struct VaultSubscriptionManagerStorage {
+        IVaultFactory vaultFactory;
+        uint64 basePeriodDuration;
+        address subscriptionSigner;
+        // TokensSettings
+        EnumerableSet.AddressSet paymentTokens;
+        mapping(address => PaymentTokenSettings) paymentTokensSettings;
+        mapping(address => uint64) sbtToSubscriptionTime;
+        // Subscription duration factors
+        mapping(uint64 => uint256) subscriptionDurationFactors;
+        // Accounts subscription data
+        mapping(address => AccountSubscriptionData) accountsSubscriptionData;
+    }
+
+    modifier onlyVault(address account_) {
+        _onlyVault(account_);
+        _;
+    }
+
     modifier onlyAvailableForPayment(address token_) {
         _onlyAvailableForPayment(token_);
+        _;
+    }
+
+    modifier onlySupportedSBT(address token_) {
+        _onlySupportedSBT(token_);
         _;
     }
 
@@ -41,12 +76,34 @@ contract VaultSubscriptionManager is IVaultSubscriptionManager, OwnableUpgradeab
 
     function initialize(
         uint64 basePeriodDuration_,
-        address vaultFactoryAddr_
+        address vaultFactoryAddr_,
+        address subscriptionSigner_,
+        PaymentTokenUpdateEntry[] calldata paymentTokenEntries_,
+        SBTTokenUpdateEntry[] calldata sbtTokenEntries_
     ) external initializer {
         __Ownable_init(msg.sender);
+        __EIP712_init("VaultSubscriptionManager", "v1.0.0");
 
         _setBasePeriodDuration(basePeriodDuration_);
+        _setSubscriptionSigner(subscriptionSigner_);
         _getVaultSubscriptionManagerStorage().vaultFactory = IVaultFactory(vaultFactoryAddr_);
+
+        _updatePaymentTokens(paymentTokenEntries_);
+        _updateSBTTokens(sbtTokenEntries_);
+    }
+
+    function setSubscriptionSigner(address newSubscriptionSigner_) external onlyOwner {
+        _setSubscriptionSigner(newSubscriptionSigner_);
+    }
+
+    function updatePaymentTokens(
+        PaymentTokenUpdateEntry[] calldata paymentTokenEntries_
+    ) external onlyOwner {
+        _updatePaymentTokens(paymentTokenEntries_);
+    }
+
+    function updateSBTTokens(SBTTokenUpdateEntry[] calldata sbtTokenEntries_) external onlyOwner {
+        _updateSBTTokens(sbtTokenEntries_);
     }
 
     function updateTokenPaymentStatus(address token_, bool newStatus_) external onlyOwner {
@@ -64,7 +121,7 @@ contract VaultSubscriptionManager is IVaultSubscriptionManager, OwnableUpgradeab
     }
 
     function updateSubscriptionDurationFactor(
-        uint256 duration_,
+        uint64 duration_,
         uint256 factor_
     ) external onlyOwner {
         VaultSubscriptionManagerStorage storage $ = _getVaultSubscriptionManagerStorage();
@@ -75,40 +132,68 @@ contract VaultSubscriptionManager is IVaultSubscriptionManager, OwnableUpgradeab
     }
 
     function withdrawTokens(address tokenAddr_, address to_, uint256 amount_) external onlyOwner {
-        require(to_ != address(0), ZeroTokensRecipient());
+        _checkAddress(to_);
 
-        _sendTokens(tokenAddr_, to_, amount_);
+        tokenAddr_.sendTokens(to_, amount_);
     }
 
     function buySubscription(
         address account_,
         address token_,
-        uint256 duration_
-    ) external payable onlyAvailableForPayment(token_) {
+        uint64 duration_
+    ) external payable onlyAvailableForPayment(token_) onlyVault(account_) {
         VaultSubscriptionManagerStorage storage $ = _getVaultSubscriptionManagerStorage();
 
         require(duration_ >= $.basePeriodDuration, InvalidSubscriptionDuration(duration_));
-        require($.vaultFactory.isVault(account_), NotAVault(account_));
-
-        AccountSubscriptionData storage accountData = $.accountsSubscriptionData[account_];
-
-        uint256 currentSubscriptionsEndTime_ = getAccountSubscriptionEndTime(account_);
-
-        if (accountData.startTime == 0) {
-            accountData.startTime = uint64(block.timestamp);
-        }
-
-        uint64 newEndTime_ = uint64(currentSubscriptionsEndTime_ + duration_);
-
-        accountData.endTime = newEndTime_;
 
         uint256 totalCost_ = getSubscriptionCost(account_, token_, duration_);
 
         _updateAccountSubscriptionCost(account_, token_);
 
-        _receiveTokens(token_, msg.sender, totalCost_);
+        token_.receiveTokens(msg.sender, totalCost_);
 
-        emit SubscriptionExtended(account_, token_, duration_, totalCost_, newEndTime_);
+        _extendSubscription(account_, duration_);
+
+        emit SubscriptionBoughtWithToken(token_, msg.sender, totalCost_);
+    }
+
+    function buySubscriptionWithSBT(
+        address account_,
+        address sbtTokenAddr_,
+        uint256 tokenId_
+    ) external onlySupportedSBT(sbtTokenAddr_) onlyVault(account_) {
+        IBurnableSBT sbtToken_ = IBurnableSBT(sbtTokenAddr_);
+
+        require(
+            sbtToken_.ownerOf(tokenId_) == msg.sender,
+            NotATokenOwner(sbtTokenAddr_, msg.sender, tokenId_)
+        );
+
+        sbtToken_.burn(tokenId_);
+
+        _extendSubscription(account_, getSubscriptionTimePerSBT(sbtTokenAddr_));
+
+        emit SubscriptionBoughtWithSBT(sbtTokenAddr_, msg.sender, tokenId_);
+    }
+
+    function buySubscriptionWithSignature(
+        address account_,
+        uint64 duration_,
+        bytes memory signature_
+    ) external onlyVault(account_) {
+        VaultSubscriptionManagerStorage storage $ = _getVaultSubscriptionManagerStorage();
+
+        uint256 currentNonce_ = _useNonce(msg.sender);
+        bytes32 buySubscriptionHash_ = hashBuySubscription(msg.sender, duration_, currentNonce_);
+        $.subscriptionSigner.checkSignature(buySubscriptionHash_, signature_);
+
+        _extendSubscription(account_, duration_);
+
+        emit SubscriptionBoughtWithSignature(msg.sender, duration_, currentNonce_);
+    }
+
+    function getVaultFactory() external view returns (address) {
+        return address(_getVaultSubscriptionManagerStorage().vaultFactory);
     }
 
     function getTokenBaseSubscriptionCost(address token_) public view returns (uint256) {
@@ -134,7 +219,7 @@ contract VaultSubscriptionManager is IVaultSubscriptionManager, OwnableUpgradeab
     function getSubscriptionCost(
         address account_,
         address token_,
-        uint256 duration_
+        uint64 duration_
     ) public view returns (uint256 totalCost_) {
         VaultSubscriptionManagerStorage storage $ = _getVaultSubscriptionManagerStorage();
 
@@ -157,17 +242,17 @@ contract VaultSubscriptionManager is IVaultSubscriptionManager, OwnableUpgradeab
         }
 
         uint256 factor_ = $.subscriptionDurationFactors[duration_];
-        if (!hasExpiredSubscription(account_) && factor_ > 0) {
+        if (!hasSubscriptionDebt(account_) && factor_ > 0) {
             totalCost_ = Math.mulDiv(totalCost_, factor_, PERCENTAGE_100);
         }
     }
 
-    function getAccountSubscriptionEndTime(address account_) public view returns (uint256) {
+    function getAccountSubscriptionEndTime(address account_) public view returns (uint64) {
         AccountSubscriptionData storage accountData = _getVaultSubscriptionManagerStorage()
             .accountsSubscriptionData[account_];
 
         if (accountData.startTime == 0) {
-            return block.timestamp;
+            return uint64(block.timestamp);
         }
 
         return accountData.endTime;
@@ -180,6 +265,14 @@ contract VaultSubscriptionManager is IVaultSubscriptionManager, OwnableUpgradeab
                 .isAvailableForPayment;
     }
 
+    function isSupportedSBT(address sbtToken_) public view returns (bool) {
+        return _getVaultSubscriptionManagerStorage().sbtToSubscriptionTime[sbtToken_] > 0;
+    }
+
+    function getSubscriptionTimePerSBT(address sbtToken_) public view returns (uint64) {
+        return _getVaultSubscriptionManagerStorage().sbtToSubscriptionTime[sbtToken_];
+    }
+
     function hasActiveSubscription(address account_) public view returns (bool) {
         AccountSubscriptionData storage accountData = _getVaultSubscriptionManagerStorage()
             .accountsSubscriptionData[account_];
@@ -187,11 +280,22 @@ contract VaultSubscriptionManager is IVaultSubscriptionManager, OwnableUpgradeab
         return block.timestamp < accountData.endTime;
     }
 
-    function hasExpiredSubscription(address account_) public view returns (bool) {
+    function hasSubscriptionDebt(address account_) public view returns (bool) {
         AccountSubscriptionData storage accountData = _getVaultSubscriptionManagerStorage()
             .accountsSubscriptionData[account_];
 
         return block.timestamp >= accountData.endTime && accountData.startTime > 0;
+    }
+
+    function hashBuySubscription(
+        address sender_,
+        uint64 duration_,
+        uint256 nonce_
+    ) public view returns (bytes32) {
+        return
+            _hashTypedDataV4(
+                keccak256(abi.encode(BUY_SUBSCRIPTION_TYPEHASH, sender_, duration_, nonce_))
+            );
     }
 
     function _setBasePeriodDuration(uint64 newBasePeriodDuration_) internal {
@@ -207,6 +311,61 @@ contract VaultSubscriptionManager is IVaultSubscriptionManager, OwnableUpgradeab
         emit BasePeriodDurationUpdated(newBasePeriodDuration_);
     }
 
+    function _setSubscriptionSigner(address newSubscriptionSigner_) internal {
+        _checkAddress(newSubscriptionSigner_);
+
+        _getVaultSubscriptionManagerStorage().subscriptionSigner = newSubscriptionSigner_;
+
+        emit SubscriptionSignerUpdated(newSubscriptionSigner_);
+    }
+
+    function _updatePaymentTokens(
+        PaymentTokenUpdateEntry[] calldata paymentTokenEntries_
+    ) internal {
+        VaultSubscriptionManagerStorage storage $ = _getVaultSubscriptionManagerStorage();
+
+        for (uint256 i = 0; i < paymentTokenEntries_.length; ++i) {
+            PaymentTokenUpdateEntry calldata currentEntry_ = paymentTokenEntries_[i];
+
+            _checkAddress(currentEntry_.paymentToken);
+
+            PaymentTokenSettings storage settings = $.paymentTokensSettings[
+                currentEntry_.paymentToken
+            ];
+
+            if (!$.paymentTokens.contains(currentEntry_.paymentToken)) {
+                $.paymentTokens.add(currentEntry_.paymentToken);
+
+                settings.isAvailableForPayment = true;
+            }
+
+            settings.baseSubscriptionCost = currentEntry_.baseSubscriptionCost;
+
+            emit PaymentTokenUpdated(
+                currentEntry_.paymentToken,
+                currentEntry_.baseSubscriptionCost
+            );
+        }
+    }
+
+    function _updateSBTTokens(SBTTokenUpdateEntry[] calldata sbtTokenEntries_) internal {
+        VaultSubscriptionManagerStorage storage $ = _getVaultSubscriptionManagerStorage();
+
+        for (uint256 i = 0; i < sbtTokenEntries_.length; ++i) {
+            SBTTokenUpdateEntry calldata currentEntry_ = sbtTokenEntries_[i];
+
+            require(
+                IBurnableSBT(currentEntry_.sbtToken).isOwner(address(this)),
+                NotAnOwnerForSBT(currentEntry_.sbtToken)
+            );
+
+            $.sbtToSubscriptionTime[currentEntry_.sbtToken] = currentEntry_
+                .subscriptionTimePerToken;
+
+            emit SBTTokenUpdated(currentEntry_.sbtToken, currentEntry_.subscriptionTimePerToken);
+        }
+    }
+
     function _updateAccountSubscriptionCost(address account_, address token_) internal {
         AccountSubscriptionData storage accountData = _getVaultSubscriptionManagerStorage()
             .accountsSubscriptionData[account_];
@@ -219,32 +378,38 @@ contract VaultSubscriptionManager is IVaultSubscriptionManager, OwnableUpgradeab
         }
     }
 
-    function _receiveTokens(address tokenAddr_, address from_, uint256 amount_) internal {
-        if (tokenAddr_ == ETH_ADDR) {
-            require(msg.value >= amount_, NotEnoughNativeCurrency(amount_, msg.value));
+    function _extendSubscription(address account_, uint64 duration_) internal {
+        AccountSubscriptionData storage accountData = _getVaultSubscriptionManagerStorage()
+            .accountsSubscriptionData[account_];
 
-            uint256 extraValue_ = msg.value - amount_;
-            if (extraValue_ > 0) {
-                Address.sendValue(payable(from_), extraValue_);
-            }
-        } else {
-            IERC20(tokenAddr_).safeTransferFrom(from_, address(this), amount_);
+        if (accountData.startTime == 0) {
+            accountData.startTime = uint64(block.timestamp);
         }
+
+        uint64 subscriptionEndTime_ = getAccountSubscriptionEndTime(account_);
+        uint64 newEndTime_ = subscriptionEndTime_ + duration_;
+
+        accountData.endTime = newEndTime_;
+
+        emit SubscriptionExtended(account_, duration_, newEndTime_);
     }
 
-    function _sendTokens(address tokenAddr_, address to_, uint256 amount_) internal {
-        if (tokenAddr_ == ETH_ADDR) {
-            amount_ = Math.min(amount_, address(this).balance);
-
-            Address.sendValue(payable(to_), amount_);
-        } else {
-            amount_ = Math.min(amount_, IERC20(tokenAddr_).balanceOf(address(this)));
-
-            IERC20(tokenAddr_).safeTransfer(to_, amount_);
-        }
+    function _onlyVault(address account_) internal view {
+        require(
+            _getVaultSubscriptionManagerStorage().vaultFactory.isVault(account_),
+            NotAVault(account_)
+        );
     }
 
     function _onlyAvailableForPayment(address token_) internal view {
         require(isAvailableForPayment(token_), NotAvailableForPayment(token_));
+    }
+
+    function _onlySupportedSBT(address token_) internal view {
+        require(isSupportedSBT(token_), NotSupportedSBT(token_));
+    }
+
+    function _checkAddress(address addr_) internal pure {
+        require(addr_ != address(0), ZeroAddr());
     }
 }

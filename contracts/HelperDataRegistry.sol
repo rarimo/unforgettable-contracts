@@ -26,46 +26,45 @@ contract HelperDataRegistry is EIP712Upgradeable {
 
     error HelperDataAlreadySet(address signer);
 
-    event HelperDataSet(address indexed account, HelperData helperData);
+    event HelperDataSet(address indexed account);
 
     function initialize() external initializer {
         __EIP712_init("HelperDataRegistry", "1");
     }
 
     function setHelperData(HelperData calldata helperData_, bytes calldata signature_) external {
-        bytes32 digest_ = _hashTypedDataV4(getHelperDataStructHash(helperData_));
+        bytes32 digest_ = hashHelperDataStruct(helperData_);
 
         address signer_ = ECDSA.recover(digest_, signature_);
 
-        HelperDataRegistryStorage storage $ = _getRecoveryManagerStorage();
+        require(!isHelperDataSet(signer_), HelperDataAlreadySet(signer_));
 
-        require(
-            $.accountsToHelperData[signer_].helperDataVersion == 0,
-            HelperDataAlreadySet(signer_)
-        );
+        _getRecoveryManagerStorage().accountsToHelperData[signer_] = helperData_;
 
-        $.accountsToHelperData[signer_] = helperData_;
-
-        emit HelperDataSet(signer_, helperData_);
+        emit HelperDataSet(signer_);
     }
 
     function getHelperData(address account_) external view returns (HelperData memory) {
         return _getRecoveryManagerStorage().accountsToHelperData[account_];
     }
 
-    function getHelperDataStructHash(
-        HelperData calldata helperData_
-    ) public pure returns (bytes32) {
+    function hashHelperDataStruct(HelperData calldata helperData_) public view returns (bytes32) {
         return
-            keccak256(
-                abi.encode(
-                    HELPERDATA_TYPEHASH,
-                    helperData_.faceVersion,
-                    helperData_.objectVersion,
-                    helperData_.helperDataVersion,
-                    keccak256(helperData_.helperData)
+            _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        HELPERDATA_TYPEHASH,
+                        helperData_.faceVersion,
+                        helperData_.objectVersion,
+                        helperData_.helperDataVersion,
+                        keccak256(helperData_.helperData)
+                    )
                 )
             );
+    }
+
+    function isHelperDataSet(address account_) public view returns (bool) {
+        return _getRecoveryManagerStorage().accountsToHelperData[account_].helperDataVersion != 0;
     }
 
     function _getRecoveryManagerStorage()

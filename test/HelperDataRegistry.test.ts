@@ -75,18 +75,16 @@ describe("HelperDataRegistry", () => {
 
       const tx2 = await registry.connect(USER2).setHelperData(helperData2, signature2);
 
-      await expect(tx1)
-        .to.emit(registry, "HelperDataSet")
-        .withArgs(USER1.address, [3, 4, 1, ethers.encodeBytes32String("data")]);
-      await expect(tx2)
-        .to.emit(registry, "HelperDataSet")
-        .withArgs(USER2.address, [1, 2, 2, ethers.encodeBytes32String("data2")]);
+      await expect(tx1).to.emit(registry, "HelperDataSet").withArgs(USER1.address);
+      await expect(tx2).to.emit(registry, "HelperDataSet").withArgs(USER2.address);
 
       expect(await registry.getHelperData(USER1)).to.be.deep.equal([3, 4, 1, ethers.encodeBytes32String("data")]);
       expect(await registry.getHelperData(USER2)).to.be.deep.equal([1, 2, 2, ethers.encodeBytes32String("data2")]);
     });
 
     it("should not set helper data if it has been already set", async () => {
+      expect(await registry.isHelperDataSet(USER1)).to.be.false;
+
       const helperData1 = {
         faceVersion: 1,
         objectVersion: 2,
@@ -97,6 +95,8 @@ describe("HelperDataRegistry", () => {
       let signature = await USER1.signTypedData(domain, types, helperData1);
 
       await registry.connect(USER1).setHelperData(helperData1, signature);
+
+      expect(await registry.isHelperDataSet(USER1)).to.be.true;
 
       const helperData2 = {
         faceVersion: 3,

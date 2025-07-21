@@ -62,7 +62,7 @@ describe("HelperDataRegistry", () => {
 
       const signature1 = await USER1.signTypedData(domain, types, helperData1);
 
-      await registry.connect(USER1).setHelperData(helperData1, signature1);
+      const tx1 = await registry.connect(USER1).setHelperData(helperData1, signature1);
 
       const helperData2 = {
         faceVersion: 1,
@@ -73,7 +73,14 @@ describe("HelperDataRegistry", () => {
 
       const signature2 = await USER2.signTypedData(domain, types, helperData2);
 
-      await registry.connect(USER2).setHelperData(helperData2, signature2);
+      const tx2 = await registry.connect(USER2).setHelperData(helperData2, signature2);
+
+      await expect(tx1)
+        .to.emit(registry, "HelperDataSet")
+        .withArgs(USER1.address, [3, 4, 1, ethers.encodeBytes32String("data")]);
+      await expect(tx2)
+        .to.emit(registry, "HelperDataSet")
+        .withArgs(USER2.address, [1, 2, 2, ethers.encodeBytes32String("data2")]);
 
       expect(await registry.getHelperData(USER1)).to.be.deep.equal([3, 4, 1, ethers.encodeBytes32String("data")]);
       expect(await registry.getHelperData(USER2)).to.be.deep.equal([1, 2, 2, ethers.encodeBytes32String("data2")]);

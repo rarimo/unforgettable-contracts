@@ -26,10 +26,14 @@ library TokensHelper {
         }
     }
 
-    function sendTokens(address tokenAddr_, address to_, uint256 amount_) internal {
-        amount_ = Math.min(amount_, getSelfBalance(tokenAddr_));
+    function sendTokens(
+        address tokenAddr_,
+        address to_,
+        uint256 amount_
+    ) internal returns (uint256 sentAmount_) {
+        sentAmount_ = Math.min(amount_, getSelfBalance(tokenAddr_));
 
-        _sendTokens(tokenAddr_, to_, amount_);
+        _sendTokens(tokenAddr_, to_, sentAmount_);
     }
 
     function sendTokensStrict(address tokenAddr_, address to_, uint256 amount_) internal {
@@ -40,7 +44,7 @@ library TokensHelper {
     }
 
     function getSelfBalance(address tokenAddr_) internal view returns (uint256) {
-        return getBalance(address(this), tokenAddr_);
+        return getBalance(tokenAddr_, address(this));
     }
 
     function getBalance(address tokenAddr_, address account_) internal view returns (uint256) {

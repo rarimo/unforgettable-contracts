@@ -108,18 +108,22 @@ contract Vault is IVault, NoncesUpgradeable, EIP712Upgradeable {
     }
 
     function deposit(address tokenAddr_, uint256 amountToDeposit_) public payable {
-        require(isVaultDisabled(), VaultDisabled());
+        require(!isVaultDisabled(), VaultDisabled());
         _checkTokensAmount(amountToDeposit_);
-
-        uint256 limitAmount_ = _getVaultStorage().vaultFactory.getTokenLimitAmount(tokenAddr_);
 
         uint256 newBalance_ = tokenAddr_.getSelfBalance();
 
         if (!tokenAddr_.isNativeToken()) {
             newBalance_ += amountToDeposit_;
+        } else if (msg.value > amountToDeposit_) {
+            newBalance_ -= msg.value - amountToDeposit_;
         }
 
-        require(newBalance_ <= limitAmount_, TokenLimitExceeded(tokenAddr_));
+        uint256 limitAmount_ = _getVaultStorage().vaultFactory.getTokenLimitAmount(tokenAddr_);
+
+        if (limitAmount_ > 0) {
+            require(newBalance_ <= limitAmount_, TokenLimitExceeded(tokenAddr_));
+        }
 
         tokenAddr_.receiveTokens(msg.sender, amountToDeposit_);
 
@@ -128,6 +132,10 @@ contract Vault is IVault, NoncesUpgradeable, EIP712Upgradeable {
 
     function getBalance(address tokenAddr_) external view returns (uint256) {
         return tokenAddr_.getSelfBalance();
+    }
+
+    function getVaultFactory() external view returns (address) {
+        return address(_getVaultStorage().vaultFactory);
     }
 
     function owner() public view returns (address) {

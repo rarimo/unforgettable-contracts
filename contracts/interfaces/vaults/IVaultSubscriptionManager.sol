@@ -34,7 +34,6 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
     error NotAVault(address vaultAddr);
     error NotEnoughNativeCurrency(uint256 requiredAmount_, uint256 availableAmount_);
     error ZeroAddr();
-    error NotAnOwnerForSBT(address tokenAddr);
     error NotSupportedSBT(address tokenAddr);
     error NotATokenOwner(address tokenAddr, address userAddr, uint256 tokenId);
 
@@ -44,6 +43,7 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
     event SBTTokenUpdated(address indexed sbtToken, uint64 subscriptionTimePerToken);
     event TokenPaymentStatusUpdated(address indexed tokenAddr, bool isAvailableForPayment);
     event SubscriptionDurationFactorUpdated(uint256 indexed duration, uint256 factor);
+    event TokensWithdrawn(address indexed tokenAddr, address recipient, uint256 amount);
     event AccountSubscriptionCostUpdated(
         address indexed account,
         address indexed token,
@@ -73,7 +73,15 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
 
     function withdrawTokens(address tokenAddr_, address to_, uint256 amount_) external;
 
+    function getBasePeriodDuration() external view returns (uint64);
+
+    function getSubscriptionSigner() external view returns (address);
+
     function getVaultFactory() external view returns (address);
+
+    function implementation() external view returns (address);
+
+    function getSubscriptionDurationFactor(uint64 duration_) external view returns (uint256);
 
     function getTokenBaseSubscriptionCost(address token_) external view returns (uint256);
 

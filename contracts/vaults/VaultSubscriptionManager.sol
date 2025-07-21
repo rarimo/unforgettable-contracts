@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import {PERCENTAGE_100} from "@solarity/solidity-lib/utils/Globals.sol";
 
@@ -21,7 +23,8 @@ contract VaultSubscriptionManager is
     IVaultSubscriptionManager,
     OwnableUpgradeable,
     NoncesUpgradeable,
-    EIP712Upgradeable
+    EIP712Upgradeable,
+    UUPSUpgradeable
 {
     using EnumerableSet for *;
     using TokensHelper for address;
@@ -94,7 +97,7 @@ contract VaultSubscriptionManager is
         _updateSBTTokens(sbtTokenEntries_);
     }
 
-    function secondStepInitialize(address vaultFactoryAddr_) external reinitializer(2) onlyOwner {
+    function secondStepInitialize(address vaultFactoryAddr_) external onlyOwner reinitializer(2) {
         _getVaultSubscriptionManagerStorage().vaultFactory = IVaultFactory(vaultFactoryAddr_);
     }
 
@@ -140,7 +143,9 @@ contract VaultSubscriptionManager is
     function withdrawTokens(address tokenAddr_, address to_, uint256 amount_) external onlyOwner {
         _checkAddress(to_);
 
-        tokenAddr_.sendTokens(to_, amount_);
+        amount_ = tokenAddr_.sendTokens(to_, amount_);
+
+        emit TokensWithdrawn(tokenAddr_, to_, amount_);
     }
 
     function buySubscription(
@@ -198,8 +203,24 @@ contract VaultSubscriptionManager is
         emit SubscriptionBoughtWithSignature(msg.sender, duration_, currentNonce_);
     }
 
+    function getBasePeriodDuration() external view returns (uint64) {
+        return _getVaultSubscriptionManagerStorage().basePeriodDuration;
+    }
+
+    function getSubscriptionSigner() external view returns (address) {
+        return _getVaultSubscriptionManagerStorage().subscriptionSigner;
+    }
+
     function getVaultFactory() external view returns (address) {
         return address(_getVaultSubscriptionManagerStorage().vaultFactory);
+    }
+
+    function implementation() external view returns (address) {
+        return ERC1967Utils.getImplementation();
+    }
+
+    function getSubscriptionDurationFactor(uint64 duration_) external view returns (uint256) {
+        return _getVaultSubscriptionManagerStorage().subscriptionDurationFactors[duration_];
     }
 
     function getTokenBaseSubscriptionCost(address token_) public view returns (uint256) {
@@ -360,11 +381,6 @@ contract VaultSubscriptionManager is
         for (uint256 i = 0; i < sbtTokenEntries_.length; ++i) {
             SBTTokenUpdateEntry calldata currentEntry_ = sbtTokenEntries_[i];
 
-            require(
-                IBurnableSBT(currentEntry_.sbtToken).isOwner(address(this)),
-                NotAnOwnerForSBT(currentEntry_.sbtToken)
-            );
-
             $.sbtToSubscriptionTime[currentEntry_.sbtToken] = currentEntry_
                 .subscriptionTimePerToken;
 
@@ -388,17 +404,19 @@ contract VaultSubscriptionManager is
         AccountSubscriptionData storage accountData = _getVaultSubscriptionManagerStorage()
             .accountsSubscriptionData[account_];
 
+        uint64 subscriptionEndTime_ = getAccountSubscriptionEndTime(account_);
+        uint64 newEndTime_ = subscriptionEndTime_ + duration_;
+
         if (accountData.startTime == 0) {
             accountData.startTime = uint64(block.timestamp);
         }
-
-        uint64 subscriptionEndTime_ = getAccountSubscriptionEndTime(account_);
-        uint64 newEndTime_ = subscriptionEndTime_ + duration_;
 
         accountData.endTime = newEndTime_;
 
         emit SubscriptionExtended(account_, duration_, newEndTime_);
     }
+
+    function _authorizeUpgrade(address newImplementation_) internal override onlyOwner {}
 
     function _onlyVault(address account_) internal view {
         require(

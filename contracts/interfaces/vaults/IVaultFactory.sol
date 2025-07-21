@@ -40,8 +40,11 @@ interface IVaultFactory {
 
     function predictVaultAddress(
         address implementation_,
-        bytes32 salt_
+        address vaultCreator_,
+        uint256 nonce_
     ) external view returns (address);
 
     function implementation() external view returns (address);
+
+    function getDeployVaultSalt(address creator_, uint256 nonce_) external pure returns (bytes32);
 }

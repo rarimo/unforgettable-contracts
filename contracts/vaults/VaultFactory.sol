@@ -59,7 +59,7 @@ contract VaultFactory is IVaultFactory, OwnableUpgradeable, UUPSUpgradeable, Non
 
     function secondStepInitialize(
         address vaultSubscriptionManager_
-    ) external reinitializer(2) onlyOwner {
+    ) external onlyOwner reinitializer(2) {
         _getVaultFactoryStorage().vaultSubscriptionManager = vaultSubscriptionManager_;
     }
 
@@ -79,7 +79,7 @@ contract VaultFactory is IVaultFactory, OwnableUpgradeable, UUPSUpgradeable, Non
         VaultFactoryStorage storage $ = _getVaultFactoryStorage();
 
         address vaultCreator_ = _msgSender();
-        bytes32 salt_ = keccak256(abi.encodePacked(vaultCreator_, _useNonce(vaultCreator_)));
+        bytes32 salt_ = getDeployVaultSalt(vaultCreator_, _useNonce(vaultCreator_));
 
         vaultAddr_ = _deploy2($.vaultImplementation, salt_);
 
@@ -123,13 +123,18 @@ contract VaultFactory is IVaultFactory, OwnableUpgradeable, UUPSUpgradeable, Non
 
     function predictVaultAddress(
         address implementation_,
-        bytes32 salt_
+        address creator_,
+        uint256 nonce_
     ) external view returns (address) {
-        return _predictAddress(implementation_, salt_);
+        return _predictAddress(implementation_, getDeployVaultSalt(creator_, nonce_));
     }
 
     function implementation() external view returns (address) {
         return ERC1967Utils.getImplementation();
+    }
+
+    function getDeployVaultSalt(address creator_, uint256 nonce_) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(creator_, nonce_));
     }
 
     function _updateVaultImplementation(address newVaultImpl_) internal {

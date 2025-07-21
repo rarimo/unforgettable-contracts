@@ -37,14 +37,14 @@ contract HelperDataRegistry is EIP712Upgradeable {
 
         address signer_ = ECDSA.recover(digest_, signature_);
 
-        HelperDataRegistryStorage storage s = _getRecoveryManagerStorage();
+        HelperDataRegistryStorage storage $ = _getRecoveryManagerStorage();
 
         require(
-            s.accountsToHelperData[signer_].helperDataVersion == 0,
+            $.accountsToHelperData[signer_].helperDataVersion == 0,
             HelperDataAlreadySet(signer_)
         );
 
-        s.accountsToHelperData[signer_] = helperData_;
+        $.accountsToHelperData[signer_] = helperData_;
 
         emit HelperDataSet(signer_, helperData_);
     }

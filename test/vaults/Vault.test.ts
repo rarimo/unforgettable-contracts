@@ -9,7 +9,7 @@ import { expect } from "chai";
 import { ethers } from "hardhat";
 
 import {
-  getUpdateDisabledStatusSignature,
+  getUpdateEnabledStatusSignature,
   getUpdateMasterKeySignature,
   getWithdrawTokensSignature,
 } from "../helpers/sign-utils";
@@ -94,7 +94,7 @@ describe("Vault", () => {
 
     vault = await ethers.getContractAt("Vault", expectedVaultAddr);
 
-    expect(await vault.isVaultDisabled()).to.be.false;
+    expect(await vault.isVaultEnabled()).to.be.true;
 
     await reverter.snapshot();
   });
@@ -147,23 +147,23 @@ describe("Vault", () => {
         .withArgs(ETHER_ADDR);
     });
 
-    it("should get exception if vault is disabled", async () => {
+    it("should get exception if vault is not enabled", async () => {
       const currentNonce = await vault.nonces(MASTER_KEY1);
-      const signature = await getUpdateDisabledStatusSignature(vault, MASTER_KEY1, {
-        newDisabledValue: true,
+      const signature = await getUpdateEnabledStatusSignature(vault, MASTER_KEY1, {
+        enabled: false,
         nonce: currentNonce,
       });
 
-      await vault.updateDisabledStatus(true, signature);
+      await vault.updateEnabledStatus(false, signature);
 
-      expect(await vault.isVaultDisabled()).to.be.true;
+      expect(await vault.isVaultEnabled()).to.be.false;
 
       await expect(
         OWNER.sendTransaction({
           to: vault,
           value: amountToDeposit,
         }),
-      ).to.be.revertedWithCustomError(vault, "VaultDisabled");
+      ).to.be.revertedWithCustomError(vault, "VaultIsNotEnabled");
     });
   });
 
@@ -208,41 +208,41 @@ describe("Vault", () => {
     });
   });
 
-  describe("#updateDisabledStatus", () => {
-    it("should correctly update disabled status", async () => {
+  describe("#updateEnabledStatus", () => {
+    it("should correctly update enabled status", async () => {
       const currentNonce = await vault.nonces(MASTER_KEY1);
-      const signature = await getUpdateDisabledStatusSignature(vault, MASTER_KEY1, {
-        newDisabledValue: true,
+      const signature = await getUpdateEnabledStatusSignature(vault, MASTER_KEY1, {
+        enabled: false,
         nonce: currentNonce,
       });
 
-      const tx = await vault.updateDisabledStatus(true, signature);
+      const tx = await vault.updateEnabledStatus(false, signature);
 
-      await expect(tx).to.emit(vault, "DisabledStatusUpdated").withArgs(true);
-      expect(await vault.isVaultDisabled()).to.be.true;
+      await expect(tx).to.emit(vault, "EnabledStatusUpdated").withArgs(false);
+      expect(await vault.isVaultEnabled()).to.be.false;
     });
 
-    it("should get exception if pass current disabled status", async () => {
+    it("should get exception if pass current enabled status", async () => {
       const currentNonce = await vault.nonces(MASTER_KEY1);
-      const signature = await getUpdateDisabledStatusSignature(vault, MASTER_KEY1, {
-        newDisabledValue: false,
+      const signature = await getUpdateEnabledStatusSignature(vault, MASTER_KEY1, {
+        enabled: true,
         nonce: currentNonce,
       });
 
-      await expect(vault.updateDisabledStatus(false, signature)).to.be.revertedWithCustomError(
+      await expect(vault.updateEnabledStatus(true, signature)).to.be.revertedWithCustomError(
         vault,
-        "InvalidNewDisabledStatus",
+        "InvalidNewEnabledStatus",
       );
     });
 
     it("should get exception if pass invalid signature", async () => {
       const currentNonce = await vault.nonces(FIRST);
-      const signature = await getUpdateDisabledStatusSignature(vault, FIRST, {
-        newDisabledValue: true,
+      const signature = await getUpdateEnabledStatusSignature(vault, FIRST, {
+        enabled: true,
         nonce: currentNonce,
       });
 
-      await expect(vault.connect(FIRST).updateDisabledStatus(true, signature)).to.be.revertedWithCustomError(
+      await expect(vault.connect(FIRST).updateEnabledStatus(true, signature)).to.be.revertedWithCustomError(
         vault,
         "InvalidSignature",
       );
@@ -396,22 +396,22 @@ describe("Vault", () => {
       expect(await testERC20.balanceOf(vault)).to.be.eq(amountToDeposit);
     });
 
-    it("should get exception if the vault is disabled", async () => {
+    it("should get exception if the vault is not enabled", async () => {
       const currentNonce = await vault.nonces(MASTER_KEY1);
-      const signature = await getUpdateDisabledStatusSignature(vault, MASTER_KEY1, {
-        newDisabledValue: true,
+      const signature = await getUpdateEnabledStatusSignature(vault, MASTER_KEY1, {
+        enabled: false,
         nonce: currentNonce,
       });
 
-      await vault.updateDisabledStatus(true, signature);
+      await vault.updateEnabledStatus(false, signature);
 
-      expect(await vault.isVaultDisabled()).to.be.true;
+      expect(await vault.isVaultEnabled()).to.be.false;
 
       const amountToDeposit = wei(1);
 
       await expect(
         vault.deposit(ETHER_ADDR, amountToDeposit, { value: amountToDeposit * 2n }),
-      ).to.be.revertedWithCustomError(vault, "VaultDisabled");
+      ).to.be.revertedWithCustomError(vault, "VaultIsNotEnabled");
     });
 
     it("should get exception if pass zero tokens amount", async () => {

@@ -7,6 +7,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
@@ -23,6 +24,7 @@ contract VaultSubscriptionManager is
     IVaultSubscriptionManager,
     OwnableUpgradeable,
     NoncesUpgradeable,
+    ReentrancyGuardUpgradeable,
     EIP712Upgradeable,
     UUPSUpgradeable
 {
@@ -89,6 +91,7 @@ contract VaultSubscriptionManager is
     ) external initializer {
         __Ownable_init(msg.sender);
         __EIP712_init("VaultSubscriptionManager", "v1.0.0");
+        __ReentrancyGuard_init();
 
         _setBasePeriodDuration(basePeriodDuration_);
         _setSubscriptionSigner(subscriptionSigner_);
@@ -140,7 +143,11 @@ contract VaultSubscriptionManager is
         emit SubscriptionDurationFactorUpdated(duration_, factor_);
     }
 
-    function withdrawTokens(address tokenAddr_, address to_, uint256 amount_) external onlyOwner {
+    function withdrawTokens(
+        address tokenAddr_,
+        address to_,
+        uint256 amount_
+    ) external onlyOwner nonReentrant {
         _checkAddress(to_);
 
         amount_ = tokenAddr_.sendTokens(to_, amount_);
@@ -152,7 +159,7 @@ contract VaultSubscriptionManager is
         address account_,
         address token_,
         uint64 duration_
-    ) external payable onlyAvailableForPayment(token_) onlyVault(account_) {
+    ) external payable onlyAvailableForPayment(token_) onlyVault(account_) nonReentrant {
         VaultSubscriptionManagerStorage storage $ = _getVaultSubscriptionManagerStorage();
 
         require(duration_ >= $.basePeriodDuration, InvalidSubscriptionDuration(duration_));
@@ -239,8 +246,9 @@ contract VaultSubscriptionManager is
         uint256 accountSavedCost_ = $.accountsSubscriptionData[account_].accountSubscriptionCosts[
             token_
         ];
+        uint256 currentCost_ = getTokenBaseSubscriptionCost(token_);
 
-        return accountSavedCost_ > 0 ? accountSavedCost_ : getTokenBaseSubscriptionCost(token_);
+        return accountSavedCost_ > 0 ? Math.min(accountSavedCost_, currentCost_) : currentCost_;
     }
 
     function getSubscriptionCost(

@@ -9,9 +9,9 @@ export const VaultWithdrawTokensTypes: Record<string, TypedDataField[]> = {
   ],
 };
 
-export const VaultUpdateDisabledStatusTypes: Record<string, TypedDataField[]> = {
-  UpdateDisabledStatus: [
-    { name: "newDisabledValue", type: "bool" },
+export const VaultUpdateEnabledStatusTypes: Record<string, TypedDataField[]> = {
+  UpdateEnabledStatus: [
+    { name: "enabled", type: "bool" },
     { name: "nonce", type: "uint256" },
   ],
 };

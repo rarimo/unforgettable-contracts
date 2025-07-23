@@ -6,11 +6,11 @@ interface IVault {
     error ZeroAmount();
     error TokenLimitExceeded(address token);
     error ZeroMasterKey();
-    error InvalidNewDisabledStatus();
-    error VaultDisabled();
+    error InvalidNewEnabledStatus();
+    error VaultIsNotEnabled();
 
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-    event DisabledStatusUpdated(bool newDisabledStatus);
+    event EnabledStatusUpdated(bool enabled);
     event TokensDeposited(address indexed token, address sender, uint256 amount);
     event TokensWithdrawn(address indexed token, address recipient, uint256 amount);
 
@@ -18,7 +18,7 @@ interface IVault {
 
     function updateMasterKey(address newMasterKey_, bytes memory signature_) external;
 
-    function updateDisabledStatus(bool newDisabledStatus_, bytes memory signature_) external;
+    function updateEnabledStatus(bool enabled_, bytes memory signature_) external;
 
     function withdrawTokens(
         address tokenAddr_,
@@ -33,7 +33,7 @@ interface IVault {
 
     function getBalance(address tokenAddr_) external view returns (uint256);
 
-    function isVaultDisabled() external view returns (bool);
+    function isVaultEnabled() external view returns (bool);
 
     function hashWithdrawTokens(
         address tokenAddr_,
@@ -42,8 +42,8 @@ interface IVault {
         uint256 nonce_
     ) external view returns (bytes32);
 
-    function hashUpdateDisabledStatus(
-        bool newDisabledValue_,
+    function hashUpdateEnabledStatus(
+        bool enabled_,
         uint256 nonce_
     ) external view returns (bytes32);
 

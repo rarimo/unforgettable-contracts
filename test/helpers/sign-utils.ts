@@ -1,6 +1,6 @@
 import {
   BuySubscriptionTypes,
-  VaultUpdateDisabledStatusTypes,
+  VaultUpdateEnabledStatusTypes,
   VaultUpdateMasterKeyTypes,
   VaultWithdrawTokensTypes,
 } from "@/test/helpers/eip712types";
@@ -11,7 +11,7 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { TypedDataDomain } from "ethers";
 
 export interface UpdateDisabledStatusData {
-  newDisabledValue: boolean;
+  enabled: boolean;
   nonce: bigint;
 }
 
@@ -59,15 +59,15 @@ export async function getDomain(contract: EIP712Upgradeable): Promise<TypedDataD
   return domain;
 }
 
-export async function getUpdateDisabledStatusSignature(
+export async function getUpdateEnabledStatusSignature(
   vault: Vault,
   account: SignerWithAddress,
   data: UpdateDisabledStatusData,
 ): Promise<string> {
   const domain = await getDomain(vault as unknown as EIP712Upgradeable);
 
-  return await account.signTypedData(domain, VaultUpdateDisabledStatusTypes, {
-    newDisabledValue: data.newDisabledValue,
+  return await account.signTypedData(domain, VaultUpdateEnabledStatusTypes, {
+    enabled: data.enabled,
     nonce: data.nonce,
   });
 }

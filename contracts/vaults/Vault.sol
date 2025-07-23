@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
 import {IVault} from "../interfaces/vaults/IVault.sol";
@@ -11,14 +12,14 @@ import {IVaultSubscriptionManager} from "../interfaces/vaults/IVaultSubscription
 import {TokensHelper} from "../libs/TokensHelper.sol";
 import {EIP712SignatureChecker} from "../libs/EIP712SignatureChecker.sol";
 
-contract Vault is IVault, NoncesUpgradeable, EIP712Upgradeable {
+contract Vault is IVault, NoncesUpgradeable, ReentrancyGuardUpgradeable, EIP712Upgradeable {
     using TokensHelper for address;
     using EIP712SignatureChecker for address;
 
     bytes32 public constant WITHDRAW_TOKENS_TYPEHASH =
         keccak256("WithdrawTokens(address token,address to,uint256 amount,uint256 nonce)");
-    bytes32 public constant UPDATE_DISABLED_STATUS_TYPEHASH =
-        keccak256("UpdateDisabledStatus(bool newDisabledValue,uint256 nonce)");
+    bytes32 public constant UPDATE_ENABLED_STATUS_TYPEHASH =
+        keccak256("UpdateEnabledStatus(bool enabled,uint256 nonce)");
     bytes32 public constant UPDATE_MASTER_KEY_TYPEHASH =
         keccak256("UpdateMasterKey(address newMasterKey,uint256 nonce)");
 
@@ -27,7 +28,7 @@ contract Vault is IVault, NoncesUpgradeable, EIP712Upgradeable {
     struct VaultStorage {
         address masterKey;
         IVaultFactory vaultFactory;
-        bool disabled;
+        bool enabled;
     }
 
     constructor() {
@@ -44,12 +45,14 @@ contract Vault is IVault, NoncesUpgradeable, EIP712Upgradeable {
 
     function initialize(address masterKey_) external initializer {
         __EIP712_init("Vault", "v1.0.0");
+        __ReentrancyGuard_init();
 
         VaultStorage storage $ = _getVaultStorage();
 
         _updateMasterKey(masterKey_);
 
         $.vaultFactory = IVaultFactory(msg.sender);
+        $.enabled = true;
     }
 
     receive() external payable {
@@ -63,20 +66,17 @@ contract Vault is IVault, NoncesUpgradeable, EIP712Upgradeable {
         _updateMasterKey(newMasterKey_);
     }
 
-    function updateDisabledStatus(bool newDisabledStatus_, bytes memory signature_) external {
+    function updateEnabledStatus(bool enabled_, bytes memory signature_) external {
         VaultStorage storage $ = _getVaultStorage();
 
-        bytes32 updateDisabledStatusHash_ = hashUpdateDisabledStatus(
-            newDisabledStatus_,
-            _useNonce(owner())
-        );
+        bytes32 updateDisabledStatusHash_ = hashUpdateEnabledStatus(enabled_, _useNonce(owner()));
         owner().checkSignature(updateDisabledStatusHash_, signature_);
 
-        require(newDisabledStatus_ != $.disabled, InvalidNewDisabledStatus());
+        require(enabled_ != $.enabled, InvalidNewEnabledStatus());
 
-        $.disabled = newDisabledStatus_;
+        $.enabled = enabled_;
 
-        emit DisabledStatusUpdated(newDisabledStatus_);
+        emit EnabledStatusUpdated(enabled_);
     }
 
     function withdrawTokens(
@@ -84,7 +84,7 @@ contract Vault is IVault, NoncesUpgradeable, EIP712Upgradeable {
         address recipient_,
         uint256 tokensAmount_,
         bytes memory signature_
-    ) external {
+    ) external nonReentrant {
         VaultStorage storage $ = _getVaultStorage();
 
         _checkTokensAmount(tokensAmount_);
@@ -107,8 +107,8 @@ contract Vault is IVault, NoncesUpgradeable, EIP712Upgradeable {
         emit TokensWithdrawn(tokenAddr_, recipient_, tokensAmount_);
     }
 
-    function deposit(address tokenAddr_, uint256 amountToDeposit_) public payable {
-        require(!isVaultDisabled(), VaultDisabled());
+    function deposit(address tokenAddr_, uint256 amountToDeposit_) public payable nonReentrant {
+        require(isVaultEnabled(), VaultIsNotEnabled());
         _checkTokensAmount(amountToDeposit_);
 
         uint256 newBalance_ = tokenAddr_.getSelfBalance();
@@ -142,8 +142,8 @@ contract Vault is IVault, NoncesUpgradeable, EIP712Upgradeable {
         return _getVaultStorage().masterKey;
     }
 
-    function isVaultDisabled() public view returns (bool) {
-        return _getVaultStorage().disabled;
+    function isVaultEnabled() public view returns (bool) {
+        return _getVaultStorage().enabled;
     }
 
     function hashWithdrawTokens(
@@ -160,13 +160,10 @@ contract Vault is IVault, NoncesUpgradeable, EIP712Upgradeable {
             );
     }
 
-    function hashUpdateDisabledStatus(
-        bool newDisabledValue_,
-        uint256 nonce_
-    ) public view returns (bytes32) {
+    function hashUpdateEnabledStatus(bool enabled_, uint256 nonce_) public view returns (bytes32) {
         return
             _hashTypedDataV4(
-                keccak256(abi.encode(UPDATE_DISABLED_STATUS_TYPEHASH, newDisabledValue_, nonce_))
+                keccak256(abi.encode(UPDATE_ENABLED_STATUS_TYPEHASH, enabled_, nonce_))
             );
     }
 

@@ -319,6 +319,8 @@ describe("VaultSubscriptionManager", () => {
       const tx = await subscriptionManager.updateSubscriptionDurationFactor(duration, factor);
 
       await expect(tx).to.emit(subscriptionManager, "SubscriptionDurationFactorUpdated").withArgs(duration, factor);
+
+      expect(await subscriptionManager.getSubscriptionDurationFactor(duration)).to.be.eq(factor);
     });
 
     it("should get exception if not an owner try to call this function", async () => {
@@ -660,6 +662,42 @@ describe("VaultSubscriptionManager", () => {
       expect(await subscriptionManager.getTokenBaseSubscriptionCost(paymentToken)).to.be.eq(
         newPaymentTokenSubscriptionCost,
       );
+
+      expect(await subscriptionManager.getSubscriptionCost(FIRST, paymentToken, duration)).to.be.eq(expectedCost);
+    });
+
+    it("should correctly count subscription cost when current cost < stored cost", async () => {
+      await vaultFactory.setDeployedVault(FIRST, true);
+
+      let duration = basePeriodDuration * 3n;
+      let expectedCost = paymentTokenSubscriptionCost * 3n;
+
+      await paymentToken.mint(OWNER, expectedCost);
+      await paymentToken.approve(subscriptionManager, expectedCost);
+
+      await subscriptionManager.buySubscription(FIRST, paymentToken, duration);
+
+      expect(await subscriptionManager.getBaseSubscriptionCostForAccount(FIRST, paymentToken)).to.be.eq(
+        paymentTokenSubscriptionCost,
+      );
+
+      const newPaymentTokenSubscriptionCost = paymentTokenSubscriptionCost / 2n;
+
+      await subscriptionManager.updatePaymentTokens([
+        {
+          paymentToken: await paymentToken.getAddress(),
+          baseSubscriptionCost: newPaymentTokenSubscriptionCost,
+        },
+      ]);
+
+      expect(await subscriptionManager.getBaseSubscriptionCostForAccount(FIRST, paymentToken)).to.be.eq(
+        newPaymentTokenSubscriptionCost,
+      );
+      expect(await subscriptionManager.getTokenBaseSubscriptionCost(paymentToken)).to.be.eq(
+        newPaymentTokenSubscriptionCost,
+      );
+
+      expectedCost = newPaymentTokenSubscriptionCost * 3n;
 
       expect(await subscriptionManager.getSubscriptionCost(FIRST, paymentToken, duration)).to.be.eq(expectedCost);
     });

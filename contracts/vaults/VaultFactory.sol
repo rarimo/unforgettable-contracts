@@ -8,6 +8,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
@@ -23,7 +24,13 @@ import {TokensHelper} from "../libs/TokensHelper.sol";
  * @title VaultFactory
  * @notice Factory contract for deploying Vault instances using CREATE2
  */
-contract VaultFactory is IVaultFactory, OwnableUpgradeable, UUPSUpgradeable, NoncesUpgradeable {
+contract VaultFactory is
+    IVaultFactory,
+    OwnableUpgradeable,
+    UUPSUpgradeable,
+    NoncesUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     using EnumerableSet for EnumerableSet.AddressSet;
     using Paginator for EnumerableSet.AddressSet;
     using TokensHelper for address;
@@ -53,6 +60,7 @@ contract VaultFactory is IVaultFactory, OwnableUpgradeable, UUPSUpgradeable, Non
 
     function initialize(address vaultImplementation_) external initializer {
         __Ownable_init(msg.sender);
+        __ReentrancyGuard_init();
 
         _updateVaultImplementation(vaultImplementation_);
     }
@@ -75,22 +83,21 @@ contract VaultFactory is IVaultFactory, OwnableUpgradeable, UUPSUpgradeable, Non
         address masterKey_,
         address paymentToken_,
         uint64 initialSubscriptionDuration_
-    ) external payable returns (address vaultAddr_) {
+    ) external payable nonReentrant returns (address vaultAddr_) {
         VaultFactoryStorage storage $ = _getVaultFactoryStorage();
 
-        address vaultCreator_ = _msgSender();
-        bytes32 salt_ = getDeployVaultSalt(vaultCreator_, _useNonce(vaultCreator_));
+        bytes32 salt_ = getDeployVaultSalt(msg.sender, _useNonce(msg.sender));
 
         vaultAddr_ = _deploy2($.vaultImplementation, salt_);
 
         IVault(vaultAddr_).initialize(masterKey_);
 
         $.deployedVaults[vaultAddr_] = true;
-        $.vaultsByCreator[vaultCreator_].add(vaultAddr_);
+        $.vaultsByCreator[msg.sender].add(vaultAddr_);
 
         _buyInitialSubscription(paymentToken_, vaultAddr_, initialSubscriptionDuration_);
 
-        emit VaultDeployed(vaultCreator_, vaultAddr_, masterKey_);
+        emit VaultDeployed(msg.sender, vaultAddr_, masterKey_);
     }
 
     function getVaultCountByCreator(address vaultCreator_) external view returns (uint256) {
@@ -172,7 +179,7 @@ contract VaultFactory is IVaultFactory, OwnableUpgradeable, UUPSUpgradeable, Non
             duration_
         );
 
-        paymentToken_.receiveTokens(_msgSender(), subscriptionCost_);
+        paymentToken_.receiveTokens(msg.sender, subscriptionCost_);
 
         uint256 valueAmount_;
 

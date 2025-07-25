@@ -41,10 +41,11 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
     error VaultNameAlreadyTaken(string vaultName);
     error VaultNameTooShort(string vaultName);
     error VaultNameUnchanged(string vaultName);
+    error InactiveVaultSubscription(address account);
 
     event BasePeriodDurationUpdated(uint256 newBasePeriodDurationValue);
-    event SubscriptionSignerUpdated(address indexed newSubscriptionSigner);
     event VaultNameRetentionPeriodUpdated(uint256 newVaultNameRetentionPeriod);
+    event SubscriptionSignerUpdated(address indexed newSubscriptionSigner);
     event PaymentTokenUpdated(
         address indexed paymentToken,
         uint256 baseSubscriptionCost,
@@ -79,7 +80,7 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
 
     function setSubscriptionSigner(address newSubscriptionSigner_) external;
 
-    function setVaultNameRetentionPeriod(uint256 newVaultNameRetentionPeriod_) external;
+    function setVaultNameRetentionPeriod(uint192 newVaultNameRetentionPeriod_) external;
 
     function updatePaymentTokens(PaymentTokenUpdateEntry[] calldata paymentTokenEntries_) external;
 
@@ -100,9 +101,15 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
 
     function getBasePeriodDuration() external view returns (uint64);
 
-    function getSubscriptionSigner() external view returns (address);
+    function getVaultNameRetentionPeriod() external view returns (uint192);
 
-    function getVaultNameRetentionPeriod() external view returns (uint256);
+    function getPaymentTokens() external view returns (address[] memory);
+
+    function getPaymentTokensSettings(
+        address token_
+    ) external view returns (PaymentTokenSettings memory);
+
+    function getSubscriptionSigner() external view returns (address);
 
     function getVaultFactory() external view returns (address);
 

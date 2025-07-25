@@ -1,5 +1,6 @@
 import {
   BuySubscriptionTypes,
+  UpdateVaultNameTypes,
   VaultUpdateEnabledStatusTypes,
   VaultUpdateMasterKeyTypes,
   VaultWithdrawTokensTypes,
@@ -8,7 +9,7 @@ import { EIP712Upgradeable, Vault, VaultSubscriptionManager } from "@ethers-v6";
 
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
-import { TypedDataDomain } from "ethers";
+import { AddressLike, TypedDataDomain } from "ethers";
 
 export interface UpdateDisabledStatusData {
   enabled: boolean;
@@ -111,5 +112,21 @@ export async function getBuySubscriptionSignature(
     sender: data.sender,
     duration: data.duration,
     nonce: data.nonce,
+  });
+}
+
+export async function getUpdateVaultNameSignature(
+  vaultSubscriptionManager: VaultSubscriptionManager,
+  account: SignerWithAddress,
+  vaultAddress: AddressLike,
+  vaultName: string,
+  nonce: bigint,
+): Promise<string> {
+  const domain = await getDomain(vaultSubscriptionManager as unknown as EIP712Upgradeable);
+
+  return await account.signTypedData(domain, UpdateVaultNameTypes, {
+    account: vaultAddress,
+    vaultName,
+    nonce,
   });
 }

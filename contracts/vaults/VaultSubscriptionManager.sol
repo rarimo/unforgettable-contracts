@@ -14,6 +14,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {PERCENTAGE_100} from "@solarity/solidity-lib/utils/Globals.sol";
 
 import {IBurnableSBT} from "../interfaces/tokens/IBurnableSBT.sol";
+import {IVault} from "../interfaces/vaults/IVault.sol";
 import {IVaultFactory} from "../interfaces/vaults/IVaultFactory.sol";
 import {IVaultSubscriptionManager} from "../interfaces/vaults/IVaultSubscriptionManager.sol";
 
@@ -35,13 +36,19 @@ contract VaultSubscriptionManager is
     bytes32 public constant BUY_SUBSCRIPTION_TYPEHASH =
         keccak256("BuySubscription(address sender,uint64 duration,uint256 nonce)");
 
+    bytes32 public constant UPDATE_VAULT_NAME_TYPEHASH =
+        keccak256("UpdateVaultName(address account,string vaultName,uint256 nonce)");
+
     bytes32 public constant VAULT_SUBSCRIPTION_MANAGER_STORAGE_SLOT =
         keccak256("unforgettable.contract.vault.subscription.manager.storage");
+
+    uint256 public constant MIN_VAULT_NAME_LENGTH = 3;
 
     struct VaultSubscriptionManagerStorage {
         IVaultFactory vaultFactory;
         uint64 basePeriodDuration;
         address subscriptionSigner;
+        uint256 vaultNameRetentionPeriod;
         // TokensSettings
         EnumerableSet.AddressSet paymentTokens;
         mapping(address => PaymentTokenSettings) paymentTokensSettings;
@@ -50,6 +57,9 @@ contract VaultSubscriptionManager is
         mapping(uint64 => uint256) subscriptionDurationFactors;
         // Accounts subscription data
         mapping(address => AccountSubscriptionData) accountsSubscriptionData;
+        // Vault names
+        mapping(address => string) vaultNames;
+        mapping(bytes32 => address) hashNamesToVaults;
     }
 
     modifier onlyVault(address account_) {
@@ -86,6 +96,7 @@ contract VaultSubscriptionManager is
     function initialize(
         uint64 basePeriodDuration_,
         address subscriptionSigner_,
+        uint256 vaultNameRetentionPeriod_,
         PaymentTokenUpdateEntry[] calldata paymentTokenEntries_,
         SBTTokenUpdateEntry[] calldata sbtTokenEntries_
     ) external initializer {
@@ -95,6 +106,7 @@ contract VaultSubscriptionManager is
 
         _setBasePeriodDuration(basePeriodDuration_);
         _setSubscriptionSigner(subscriptionSigner_);
+        _setVaultNameRetentionPeriod(vaultNameRetentionPeriod_);
 
         _updatePaymentTokens(paymentTokenEntries_);
         _updateSBTTokens(sbtTokenEntries_);
@@ -106,6 +118,10 @@ contract VaultSubscriptionManager is
 
     function setSubscriptionSigner(address newSubscriptionSigner_) external onlyOwner {
         _setSubscriptionSigner(newSubscriptionSigner_);
+    }
+
+    function setVaultNameRetentionPeriod(uint256 newVaultNameRetentionPeriod_) external onlyOwner {
+        _setVaultNameRetentionPeriod(newVaultNameRetentionPeriod_);
     }
 
     function updatePaymentTokens(
@@ -210,12 +226,37 @@ contract VaultSubscriptionManager is
         emit SubscriptionBoughtWithSignature(msg.sender, duration_, currentNonce_);
     }
 
+    function updateVaultName(
+        address account_,
+        address token_,
+        string memory vaultName_,
+        bytes memory signature_
+    ) external payable onlyAvailableForPayment(token_) onlyVault(account_) nonReentrant {
+        _validateVaultName(vaultName_, account_);
+
+        uint256 currentNonce_ = _useNonce(account_);
+        bytes32 updateVaultNameHash_ = hashUpdateVaultName(account_, vaultName_, currentNonce_);
+
+        address vaultOwner_ = IVault(account_).owner();
+        vaultOwner_.checkSignature(updateVaultNameHash_, signature_);
+
+        uint256 vaultNameCost_ = getVaultNameCost(token_, vaultName_);
+
+        token_.receiveTokens(vaultOwner_, vaultNameCost_);
+
+        _updateVaultName(account_, vaultName_);
+    }
+
     function getBasePeriodDuration() external view returns (uint64) {
         return _getVaultSubscriptionManagerStorage().basePeriodDuration;
     }
 
     function getSubscriptionSigner() external view returns (address) {
         return _getVaultSubscriptionManagerStorage().subscriptionSigner;
+    }
+
+    function getVaultNameRetentionPeriod() external view returns (uint256) {
+        return _getVaultSubscriptionManagerStorage().vaultNameRetentionPeriod;
     }
 
     function getVaultFactory() external view returns (address) {
@@ -235,6 +276,11 @@ contract VaultSubscriptionManager is
             _getVaultSubscriptionManagerStorage()
                 .paymentTokensSettings[token_]
                 .baseSubscriptionCost;
+    }
+
+    function getTokenBaseVaultNameCost(address token_) public view returns (uint256) {
+        return
+            _getVaultSubscriptionManagerStorage().paymentTokensSettings[token_].baseVaultNameCost;
     }
 
     function getBaseSubscriptionCostForAccount(
@@ -282,6 +328,16 @@ contract VaultSubscriptionManager is
         }
     }
 
+    function getVaultNameCost(
+        address token_,
+        string memory vaultName_
+    ) public view returns (uint256) {
+        uint256 baseVaultNameCostInTokens_ = getTokenBaseVaultNameCost(token_);
+        uint256 factor_ = _getVaultNameCostMultiplier(vaultName_);
+
+        return Math.mulDiv(baseVaultNameCostInTokens_, factor_, PERCENTAGE_100);
+    }
+
     function getAccountSubscriptionEndTime(address account_) public view returns (uint64) {
         AccountSubscriptionData storage accountData = _getVaultSubscriptionManagerStorage()
             .accountsSubscriptionData[account_];
@@ -322,6 +378,15 @@ contract VaultSubscriptionManager is
         return block.timestamp >= accountData.endTime && accountData.startTime > 0;
     }
 
+    function getVaultName(address account_) public view returns (string memory) {
+        return _getVaultSubscriptionManagerStorage().vaultNames[account_];
+    }
+
+    function getVault(string memory vaultName_) public view returns (address) {
+        return
+            _getVaultSubscriptionManagerStorage().hashNamesToVaults[keccak256(bytes(vaultName_))];
+    }
+
     function hashBuySubscription(
         address sender_,
         uint64 duration_,
@@ -331,6 +396,40 @@ contract VaultSubscriptionManager is
             _hashTypedDataV4(
                 keccak256(abi.encode(BUY_SUBSCRIPTION_TYPEHASH, sender_, duration_, nonce_))
             );
+    }
+
+    function hashUpdateVaultName(
+        address account_,
+        string memory vaultName_,
+        uint256 nonce_
+    ) public view returns (bytes32) {
+        return
+            _hashTypedDataV4(
+                keccak256(
+                    abi.encode(
+                        UPDATE_VAULT_NAME_TYPEHASH,
+                        account_,
+                        keccak256(bytes(vaultName_)),
+                        nonce_
+                    )
+                )
+            );
+    }
+
+    function isVaultNameAvailable(string memory name_) public view returns (bool) {
+        address previousVault_ = getVault(name_);
+
+        if (previousVault_ == address(0)) {
+            return true;
+        }
+
+        uint64 subscriptionEndTime_ = getAccountSubscriptionEndTime(previousVault_);
+
+        bool retentionPeriodPassed_ = subscriptionEndTime_ +
+            _getVaultSubscriptionManagerStorage().vaultNameRetentionPeriod <
+            block.timestamp;
+
+        return hasSubscriptionDebt(previousVault_) && retentionPeriodPassed_;
     }
 
     function _setBasePeriodDuration(uint64 newBasePeriodDuration_) internal {
@@ -354,6 +453,13 @@ contract VaultSubscriptionManager is
         emit SubscriptionSignerUpdated(newSubscriptionSigner_);
     }
 
+    function _setVaultNameRetentionPeriod(uint256 newVaultNameRetentionPeriod_) internal {
+        _getVaultSubscriptionManagerStorage()
+            .vaultNameRetentionPeriod = newVaultNameRetentionPeriod_;
+
+        emit VaultNameRetentionPeriodUpdated(newVaultNameRetentionPeriod_);
+    }
+
     function _updatePaymentTokens(
         PaymentTokenUpdateEntry[] calldata paymentTokenEntries_
     ) internal {
@@ -375,10 +481,12 @@ contract VaultSubscriptionManager is
             }
 
             settings.baseSubscriptionCost = currentEntry_.baseSubscriptionCost;
+            settings.baseVaultNameCost = currentEntry_.baseVaultNameCost;
 
             emit PaymentTokenUpdated(
                 currentEntry_.paymentToken,
-                currentEntry_.baseSubscriptionCost
+                currentEntry_.baseSubscriptionCost,
+                currentEntry_.baseVaultNameCost
             );
         }
     }
@@ -424,7 +532,37 @@ contract VaultSubscriptionManager is
         emit SubscriptionExtended(account_, duration_, newEndTime_);
     }
 
+    function _updateVaultName(address account_, string memory vaultName_) internal {
+        VaultSubscriptionManagerStorage storage $ = _getVaultSubscriptionManagerStorage();
+
+        address previousVault_ = getVault(vaultName_);
+
+        if (previousVault_ != address(0)) {
+            delete $.vaultNames[previousVault_];
+
+            emit VaultNameReassigned(vaultName_, previousVault_, account_);
+        }
+
+        $.vaultNames[account_] = vaultName_;
+        $.hashNamesToVaults[keccak256(bytes(vaultName_))] = account_;
+
+        emit VaultNameUpdated(account_, vaultName_);
+    }
+
     function _authorizeUpgrade(address newImplementation_) internal override onlyOwner {}
+
+    function _validateVaultName(string memory vaultName_, address account_) internal view {
+        require(bytes(vaultName_).length >= MIN_VAULT_NAME_LENGTH, VaultNameTooShort(vaultName_));
+
+        string memory currentName_ = getVaultName(account_);
+
+        require(
+            keccak256(bytes(currentName_)) != keccak256(bytes(vaultName_)),
+            VaultNameUnchanged(vaultName_)
+        );
+
+        require(isVaultNameAvailable(vaultName_), VaultNameAlreadyTaken(vaultName_));
+    }
 
     function _onlyVault(address account_) internal view {
         require(
@@ -443,5 +581,20 @@ contract VaultSubscriptionManager is
 
     function _checkAddress(address addr_) internal pure {
         require(addr_ != address(0), ZeroAddr());
+    }
+
+    function _getVaultNameCostMultiplier(
+        string memory vaultName_
+    ) internal pure returns (uint256) {
+        uint256 nameLength_ = bytes(vaultName_).length;
+
+        if (nameLength_ >= 5) {
+            return 158548959919;
+        }
+        if (nameLength_ == 4) {
+            return 5073566717402;
+        }
+
+        return 20294266869609;
     }
 }

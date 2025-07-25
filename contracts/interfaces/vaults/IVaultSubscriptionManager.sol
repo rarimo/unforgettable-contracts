@@ -7,6 +7,7 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
     struct PaymentTokenUpdateEntry {
         address paymentToken;
         uint256 baseSubscriptionCost;
+        uint256 baseVaultNameCost;
     }
 
     struct SBTTokenUpdateEntry {
@@ -16,6 +17,7 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
 
     struct PaymentTokenSettings {
         uint256 baseSubscriptionCost;
+        uint256 baseVaultNameCost;
         bool isAvailableForPayment;
     }
 
@@ -36,10 +38,18 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
     error ZeroAddr();
     error NotSupportedSBT(address tokenAddr);
     error NotATokenOwner(address tokenAddr, address userAddr, uint256 tokenId);
+    error VaultNameAlreadyTaken(string vaultName);
+    error VaultNameTooShort(string vaultName);
+    error VaultNameUnchanged(string vaultName);
 
     event BasePeriodDurationUpdated(uint256 newBasePeriodDurationValue);
     event SubscriptionSignerUpdated(address indexed newSubscriptionSigner);
-    event PaymentTokenUpdated(address indexed paymentToken, uint256 baseSubscriptionCost);
+    event VaultNameRetentionPeriodUpdated(uint256 newVaultNameRetentionPeriod);
+    event PaymentTokenUpdated(
+        address indexed paymentToken,
+        uint256 baseSubscriptionCost,
+        uint256 baseVaultNameCost
+    );
     event SBTTokenUpdated(address indexed sbtToken, uint64 subscriptionTimePerToken);
     event TokenPaymentStatusUpdated(address indexed tokenAddr, bool isAvailableForPayment);
     event SubscriptionDurationFactorUpdated(uint256 indexed duration, uint256 factor);
@@ -60,8 +70,16 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
         uint256 tokenId
     );
     event SubscriptionBoughtWithSignature(address indexed sender, uint64 duration, uint256 nonce);
+    event VaultNameUpdated(address indexed account, string vaultName);
+    event VaultNameReassigned(
+        string vaultName,
+        address indexed oldVault,
+        address indexed newVault
+    );
 
     function setSubscriptionSigner(address newSubscriptionSigner_) external;
+
+    function setVaultNameRetentionPeriod(uint256 newVaultNameRetentionPeriod_) external;
 
     function updatePaymentTokens(PaymentTokenUpdateEntry[] calldata paymentTokenEntries_) external;
 
@@ -73,9 +91,18 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
 
     function withdrawTokens(address tokenAddr_, address to_, uint256 amount_) external;
 
+    function updateVaultName(
+        address account_,
+        address token_,
+        string memory vaultName_,
+        bytes memory signature_
+    ) external payable;
+
     function getBasePeriodDuration() external view returns (uint64);
 
     function getSubscriptionSigner() external view returns (address);
+
+    function getVaultNameRetentionPeriod() external view returns (uint256);
 
     function getVaultFactory() external view returns (address);
 
@@ -85,18 +112,37 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
 
     function getTokenBaseSubscriptionCost(address token_) external view returns (uint256);
 
+    function getTokenBaseVaultNameCost(address token_) external view returns (uint256);
+
     function getBaseSubscriptionCostForAccount(
         address account_,
         address token_
+    ) external view returns (uint256);
+
+    function getVaultNameCost(
+        address token_,
+        string memory vaultName_
     ) external view returns (uint256);
 
     function isSupportedSBT(address sbtToken_) external view returns (bool);
 
     function getSubscriptionTimePerSBT(address sbtToken_) external view returns (uint64);
 
+    function getVaultName(address account_) external view returns (string memory);
+
+    function getVault(string memory vaultName_) external view returns (address);
+
     function hashBuySubscription(
         address sender_,
         uint64 duration_,
         uint256 nonce_
     ) external view returns (bytes32);
+
+    function hashUpdateVaultName(
+        address account_,
+        string memory vaultName_,
+        uint256 nonce_
+    ) external view returns (bytes32);
+
+    function isVaultNameAvailable(string memory name_) external view returns (bool);
 }

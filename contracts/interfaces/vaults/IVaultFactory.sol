@@ -19,7 +19,8 @@ interface IVaultFactory {
     function deployVault(
         address masterKey_,
         address paymentToken_,
-        uint64 initialSubscriptionDuration_
+        uint64 initialSubscriptionDuration_,
+        string memory vaultName_
     ) external payable returns (address vaultAddr_);
 
     function getVaultCountByCreator(address vaultCreator_) external view returns (uint256);

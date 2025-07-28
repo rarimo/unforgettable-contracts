@@ -49,7 +49,7 @@ describe("VaultFactory", () => {
 
     const subscriptionManagerImpl = await ethers.deployContract("VaultSubscriptionManager");
     const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
-      "initialize(uint64,uint192,address,(address,uint256, uint256)[],(address,uint64)[])",
+      "initialize(uint64,uint64,address,(address,uint256, uint256)[],(address,uint64)[])",
       [
         basePeriodDuration,
         3600n * 24n,
@@ -218,13 +218,20 @@ describe("VaultFactory", () => {
         paymentToken,
         initialSubscriptionDuration,
       );
+      const expectedVaultNameCost = await subscriptionManager.getVaultNameCost(paymentToken, "abc");
 
-      await paymentToken.connect(FIRST).approve(vaultFactory, expectedSubscriptionCost);
-      const tx = await vaultFactory.connect(FIRST).deployVault(MASTER_KEY1, paymentToken, initialSubscriptionDuration);
+      const expectedTotalCost = expectedSubscriptionCost + expectedVaultNameCost;
+
+      await paymentToken.connect(FIRST).approve(vaultFactory, expectedTotalCost);
+      const tx = await vaultFactory
+        .connect(FIRST)
+        .deployVault(MASTER_KEY1, paymentToken, initialSubscriptionDuration, "abc");
 
       await expect(tx)
         .to.emit(vaultFactory, "VaultDeployed")
         .withArgs(FIRST.address, expectedVaultAddr, MASTER_KEY1.address);
+
+      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(expectedVaultAddr, "abc");
 
       expect(await vaultFactory.getVaultCountByCreator(FIRST)).to.be.eq(1);
       expect(await vaultFactory.getVaultsByCreatorPart(FIRST, 0, 10)).to.be.deep.eq([expectedVaultAddr]);
@@ -234,10 +241,13 @@ describe("VaultFactory", () => {
 
       expect(await deployedVault.owner()).to.be.eq(MASTER_KEY1);
 
+      expect(await subscriptionManager.getVault("abc")).to.be.eq(expectedVaultAddr);
+      expect(await subscriptionManager.getVaultName(expectedVaultAddr)).to.be.eq("abc");
+
       await expect(tx).to.changeTokenBalances(
         paymentToken,
         [FIRST, subscriptionManager],
-        [-expectedSubscriptionCost, expectedSubscriptionCost],
+        [-expectedTotalCost, expectedTotalCost],
       );
 
       expect(await subscriptionManager.hasActiveSubscription(expectedVaultAddr)).to.be.true;
@@ -252,19 +262,21 @@ describe("VaultFactory", () => {
         ETHER_ADDR,
         initialSubscriptionDuration,
       );
+      const expectedVaultNameCost = await subscriptionManager.getVaultNameCost(ETHER_ADDR, "1234");
+
+      const expectedTotalCost = expectedSubscriptionCost + expectedVaultNameCost;
 
       const tx = await vaultFactory
         .connect(FIRST)
-        .deployVault(MASTER_KEY1, ETHER_ADDR, initialSubscriptionDuration, { value: expectedSubscriptionCost * 2n });
+        .deployVault(MASTER_KEY1, ETHER_ADDR, initialSubscriptionDuration, "1234", { value: expectedTotalCost });
 
       await expect(tx)
         .to.emit(vaultFactory, "VaultDeployed")
         .withArgs(FIRST.address, expectedVaultAddr, MASTER_KEY1.address);
 
-      await expect(tx).to.changeEtherBalances(
-        [FIRST, subscriptionManager],
-        [-expectedSubscriptionCost, expectedSubscriptionCost],
-      );
+      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(expectedVaultAddr, "1234");
+
+      await expect(tx).to.changeEtherBalances([FIRST, subscriptionManager], [-expectedTotalCost, expectedTotalCost]);
     });
   });
 });

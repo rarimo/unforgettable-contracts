@@ -47,7 +47,7 @@ contract VaultSubscriptionManager is
     struct VaultSubscriptionManagerStorage {
         IVaultFactory vaultFactory;
         uint64 basePeriodDuration;
-        uint192 vaultNameRetentionPeriod;
+        uint64 vaultNameRetentionPeriod;
         address subscriptionSigner;
         // TokensSettings
         EnumerableSet.AddressSet paymentTokens;
@@ -95,7 +95,7 @@ contract VaultSubscriptionManager is
 
     function initialize(
         uint64 basePeriodDuration_,
-        uint192 vaultNameRetentionPeriod_,
+        uint64 vaultNameRetentionPeriod_,
         address subscriptionSigner_,
         PaymentTokenUpdateEntry[] calldata paymentTokenEntries_,
         SBTTokenUpdateEntry[] calldata sbtTokenEntries_
@@ -120,7 +120,7 @@ contract VaultSubscriptionManager is
         _setSubscriptionSigner(newSubscriptionSigner_);
     }
 
-    function setVaultNameRetentionPeriod(uint192 newVaultNameRetentionPeriod_) external onlyOwner {
+    function setVaultNameRetentionPeriod(uint64 newVaultNameRetentionPeriod_) external onlyOwner {
         _setVaultNameRetentionPeriod(newVaultNameRetentionPeriod_);
     }
 
@@ -232,19 +232,26 @@ contract VaultSubscriptionManager is
         string memory vaultName_,
         bytes memory signature_
     ) external payable onlyAvailableForPayment(token_) onlyVault(account_) nonReentrant {
-        _validateVaultName(vaultName_, account_);
-
         uint256 currentNonce_ = _useNonce(account_);
         bytes32 updateVaultNameHash_ = hashUpdateVaultName(account_, vaultName_, currentNonce_);
 
         address vaultOwner_ = IVault(account_).owner();
         vaultOwner_.checkSignature(updateVaultNameHash_, signature_);
 
-        uint256 vaultNameCost_ = getVaultNameCost(token_, vaultName_);
+        _updateVaultName(account_, token_, vaultOwner_, vaultName_);
+    }
 
-        token_.receiveTokens(vaultOwner_, vaultNameCost_);
+    function updateVaultName(
+        address account_,
+        address token_,
+        string memory vaultName_
+    ) external payable onlyAvailableForPayment(token_) onlyVault(account_) nonReentrant {
+        require(
+            address(_getVaultSubscriptionManagerStorage().vaultFactory) == msg.sender,
+            NotAVaultFactory(msg.sender)
+        );
 
-        _updateVaultName(account_, vaultName_);
+        _updateVaultName(account_, token_, msg.sender, vaultName_);
     }
 
     function getBasePeriodDuration() external view returns (uint64) {
@@ -255,7 +262,7 @@ contract VaultSubscriptionManager is
         return _getVaultSubscriptionManagerStorage().subscriptionSigner;
     }
 
-    function getVaultNameRetentionPeriod() external view returns (uint192) {
+    function getVaultNameRetentionPeriod() external view returns (uint64) {
         return _getVaultSubscriptionManagerStorage().vaultNameRetentionPeriod;
     }
 
@@ -454,7 +461,7 @@ contract VaultSubscriptionManager is
         emit BasePeriodDurationUpdated(newBasePeriodDuration_);
     }
 
-    function _setVaultNameRetentionPeriod(uint192 newVaultNameRetentionPeriod_) internal {
+    function _setVaultNameRetentionPeriod(uint64 newVaultNameRetentionPeriod_) internal {
         _getVaultSubscriptionManagerStorage()
             .vaultNameRetentionPeriod = newVaultNameRetentionPeriod_;
 
@@ -541,7 +548,17 @@ contract VaultSubscriptionManager is
         emit SubscriptionExtended(account_, duration_, newEndTime_);
     }
 
-    function _updateVaultName(address account_, string memory vaultName_) internal {
+    function _updateVaultName(
+        address account_,
+        address token_,
+        address payer_,
+        string memory vaultName_
+    ) internal {
+        _validateVaultName(vaultName_, account_);
+
+        uint256 vaultNameCost_ = getVaultNameCost(token_, vaultName_);
+        token_.receiveTokens(payer_, vaultNameCost_);
+
         VaultSubscriptionManagerStorage storage $ = _getVaultSubscriptionManagerStorage();
 
         address previousVault_ = getVault(vaultName_);

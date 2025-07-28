@@ -34,6 +34,7 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
     error ZeroDuration();
     error InvalidSubscriptionDuration(uint256 duration);
     error NotAVault(address vaultAddr);
+    error NotAVaultFactory(address vaultAddr);
     error NotEnoughNativeCurrency(uint256 requiredAmount_, uint256 availableAmount_);
     error ZeroAddr();
     error NotSupportedSBT(address tokenAddr);
@@ -80,7 +81,7 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
 
     function setSubscriptionSigner(address newSubscriptionSigner_) external;
 
-    function setVaultNameRetentionPeriod(uint192 newVaultNameRetentionPeriod_) external;
+    function setVaultNameRetentionPeriod(uint64 newVaultNameRetentionPeriod_) external;
 
     function updatePaymentTokens(PaymentTokenUpdateEntry[] calldata paymentTokenEntries_) external;
 
@@ -99,9 +100,15 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
         bytes memory signature_
     ) external payable;
 
+    function updateVaultName(
+        address account_,
+        address token_,
+        string memory vaultName_
+    ) external payable;
+
     function getBasePeriodDuration() external view returns (uint64);
 
-    function getVaultNameRetentionPeriod() external view returns (uint192);
+    function getVaultNameRetentionPeriod() external view returns (uint64);
 
     function getPaymentTokens() external view returns (address[] memory);
 

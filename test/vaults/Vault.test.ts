@@ -53,7 +53,7 @@ describe("Vault", () => {
 
     const subscriptionManagerImpl = await ethers.deployContract("VaultSubscriptionManager");
     const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
-      "initialize(uint64,uint192,address,(address,uint256, uint256)[],(address,uint64)[])",
+      "initialize(uint64,uint64,address,(address,uint256, uint256)[],(address,uint64)[])",
       [
         basePeriodDuration,
         3600n * 24n,
@@ -90,9 +90,9 @@ describe("Vault", () => {
       initialSubscriptionDuration,
     );
 
-    await vaultFactory
-      .connect(FIRST)
-      .deployVault(MASTER_KEY1, ETHER_ADDR, initialSubscriptionDuration, { value: expectedSubscriptionCost * 2n });
+    await vaultFactory.connect(FIRST).deployVault(MASTER_KEY1, ETHER_ADDR, initialSubscriptionDuration, "abcd", {
+      value: expectedSubscriptionCost * 2n,
+    });
 
     vault = await ethers.getContractAt("Vault", expectedVaultAddr);
 

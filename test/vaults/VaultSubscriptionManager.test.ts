@@ -6,9 +6,10 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 import { expect } from "chai";
+import { AddressLike } from "ethers";
 import { ethers } from "hardhat";
 
-import { getBuySubscriptionSignature } from "../helpers/sign-utils";
+import { getBuySubscriptionSignature, getUpdateVaultNameSignature } from "../helpers/sign-utils";
 
 describe("VaultSubscriptionManager", () => {
   const reverter = new Reverter();
@@ -17,8 +18,16 @@ describe("VaultSubscriptionManager", () => {
   const basePeriodDuration = 3600n * 24n * 30n;
   const sbtSubscriptionTime = basePeriodDuration * 12n;
 
+  const vaultNameRetentionPeriod = 3600n * 24n;
+
   const nativeSubscriptionCost = wei(1, 15);
   const paymentTokenSubscriptionCost = wei(5);
+
+  const nativeVaultNameCost = wei(1, 6);
+  const paymentTokenVaultNameCost = wei(1);
+
+  const threeLetterFactor = 50n;
+  const fourLetterFactor = 5n;
 
   let OWNER: SignerWithAddress;
   let SUBSCRIPTION_SIGNER: SignerWithAddress;
@@ -45,18 +54,21 @@ describe("VaultSubscriptionManager", () => {
 
     subscriptionManagerImpl = await ethers.deployContract("VaultSubscriptionManager");
     const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
-      "initialize(uint64,address,(address,uint256)[],(address,uint64)[])",
+      "initialize(uint64,uint64,address,(address,uint256, uint256)[],(address,uint64)[])",
       [
         basePeriodDuration,
+        vaultNameRetentionPeriod,
         SUBSCRIPTION_SIGNER.address,
         [
           {
             paymentToken: ETHER_ADDR,
             baseSubscriptionCost: nativeSubscriptionCost,
+            baseVaultNameCost: nativeVaultNameCost,
           },
           {
             paymentToken: await paymentToken.getAddress(),
             baseSubscriptionCost: paymentTokenSubscriptionCost,
+            baseVaultNameCost: paymentTokenVaultNameCost,
           },
         ],
         [
@@ -97,8 +109,20 @@ describe("VaultSubscriptionManager", () => {
       expect(await subscriptionManager.implementation()).to.be.eq(subscriptionManagerImpl);
       expect(await subscriptionManager.getBasePeriodDuration()).to.be.eq(basePeriodDuration);
       expect(await subscriptionManager.getSubscriptionSigner()).to.be.eq(SUBSCRIPTION_SIGNER);
+      expect(await subscriptionManager.getVaultNameRetentionPeriod()).to.be.eq(vaultNameRetentionPeriod);
       expect(await subscriptionManager.getVaultFactory()).to.be.eq(vaultFactory);
 
+      expect(await subscriptionManager.getPaymentTokens()).to.be.deep.eq([ETHER_ADDR, await paymentToken.getAddress()]);
+      expect(await subscriptionManager.getPaymentTokensSettings(ETHER_ADDR)).to.be.deep.eq([
+        nativeSubscriptionCost,
+        nativeVaultNameCost,
+        true,
+      ]);
+      expect(await subscriptionManager.getPaymentTokensSettings(paymentToken)).to.be.deep.eq([
+        paymentTokenSubscriptionCost,
+        paymentTokenVaultNameCost,
+        true,
+      ]);
       expect(await subscriptionManager.isAvailableForPayment(ETHER_ADDR)).to.be.true;
       expect(await subscriptionManager.getTokenBaseSubscriptionCost(ETHER_ADDR)).to.be.eq(nativeSubscriptionCost);
       expect(await subscriptionManager.isAvailableForPayment(paymentToken)).to.be.true;
@@ -112,7 +136,13 @@ describe("VaultSubscriptionManager", () => {
 
     it("should get exception if try to call init function twice", async () => {
       await expect(
-        subscriptionManager.initialize(basePeriodDuration, SUBSCRIPTION_SIGNER.address, [], []),
+        subscriptionManager.initialize(
+          basePeriodDuration,
+          vaultNameRetentionPeriod,
+          SUBSCRIPTION_SIGNER.address,
+          [],
+          [],
+        ),
       ).to.be.revertedWithCustomError(subscriptionManager, "InvalidInitialization");
     });
 
@@ -177,15 +207,35 @@ describe("VaultSubscriptionManager", () => {
     });
   });
 
+  describe("#setVaultNameRetentionPeriod", () => {
+    it("should correctly set new vault name retention period", async () => {
+      const tx = await subscriptionManager.setVaultNameRetentionPeriod(vaultNameRetentionPeriod / 2n);
+
+      expect(await subscriptionManager.getVaultNameRetentionPeriod()).to.be.eq(vaultNameRetentionPeriod / 2n);
+
+      await expect(tx)
+        .to.emit(subscriptionManager, "VaultNameRetentionPeriodUpdated")
+        .withArgs(vaultNameRetentionPeriod / 2n);
+    });
+
+    it("should get exception if not an owner try to call this function", async () => {
+      await expect(subscriptionManager.connect(FIRST).setVaultNameRetentionPeriod(100n))
+        .to.be.revertedWithCustomError(subscriptionManager, "OwnableUnauthorizedAccount")
+        .withArgs(FIRST.address);
+    });
+  });
+
   describe("#updatePaymentTokens", () => {
     it("should correctly add new payment tokens", async () => {
       const newToken = await ethers.deployContract("ERC20Mock", ["Test ERC20 2", "TT2", 18]);
       const subscriptionCost = wei(5);
+      const vaultNameCost = wei(2);
 
       const tx = await subscriptionManager.updatePaymentTokens([
         {
           paymentToken: await newToken.getAddress(),
           baseSubscriptionCost: subscriptionCost,
+          baseVaultNameCost: vaultNameCost,
         },
       ]);
 
@@ -193,10 +243,11 @@ describe("VaultSubscriptionManager", () => {
       expect(await subscriptionManager.getTokenBaseSubscriptionCost(await newToken.getAddress())).to.be.eq(
         subscriptionCost,
       );
+      expect(await subscriptionManager.getTokenBaseVaultNameCost(await newToken.getAddress())).to.be.eq(vaultNameCost);
 
       await expect(tx)
         .to.emit(subscriptionManager, "PaymentTokenUpdated")
-        .withArgs(await newToken.getAddress(), subscriptionCost);
+        .withArgs(await newToken.getAddress(), subscriptionCost, vaultNameCost);
     });
 
     it("should correctly update subscription cost without status", async () => {
@@ -205,16 +256,20 @@ describe("VaultSubscriptionManager", () => {
       expect(await subscriptionManager.isAvailableForPayment(ETHER_ADDR)).to.be.false;
 
       const newSubscriptionCost = nativeSubscriptionCost * 2n;
+      const newVaultNameCost = nativeVaultNameCost * 2n;
       const tx = await subscriptionManager.updatePaymentTokens([
         {
           paymentToken: ETHER_ADDR,
           baseSubscriptionCost: newSubscriptionCost,
+          baseVaultNameCost: newVaultNameCost,
         },
       ]);
 
       expect(await subscriptionManager.isAvailableForPayment(ETHER_ADDR)).to.be.false;
 
-      await expect(tx).to.emit(subscriptionManager, "PaymentTokenUpdated").withArgs(ETHER_ADDR, newSubscriptionCost);
+      await expect(tx)
+        .to.emit(subscriptionManager, "PaymentTokenUpdated")
+        .withArgs(ETHER_ADDR, newSubscriptionCost, newVaultNameCost);
     });
 
     it("should get exception if pass zero address", async () => {
@@ -223,6 +278,7 @@ describe("VaultSubscriptionManager", () => {
           {
             paymentToken: ethers.ZeroAddress,
             baseSubscriptionCost: wei(1),
+            baseVaultNameCost: wei(2),
           },
         ]),
       ).to.be.revertedWithCustomError(subscriptionManager, "ZeroAddr");
@@ -234,6 +290,7 @@ describe("VaultSubscriptionManager", () => {
           {
             paymentToken: FIRST.address,
             baseSubscriptionCost: wei(1),
+            baseVaultNameCost: wei(2),
           },
         ]),
       )
@@ -416,6 +473,7 @@ describe("VaultSubscriptionManager", () => {
         {
           paymentToken: await paymentToken.getAddress(),
           baseSubscriptionCost: paymentTokenSubscriptionCost * 2n,
+          baseVaultNameCost: paymentTokenVaultNameCost * 2n,
         },
       ]);
 
@@ -622,6 +680,302 @@ describe("VaultSubscriptionManager", () => {
     });
   });
 
+  describe("#updateVaultName", () => {
+    let vaultAddress1: AddressLike;
+    let vaultAddress2: AddressLike;
+
+    const updateVaultName = async (vault: AddressLike, token: ERC20Mock, name: string, signature: string) => {
+      return await subscriptionManager["updateVaultName(address,address,string,bytes)"](vault, token, name, signature);
+    };
+
+    beforeEach("setup", async () => {
+      const vault1 = await ethers.deployContract("VaultMock", [OWNER.address]);
+      const vault2 = await ethers.deployContract("VaultMock", [FIRST.address]);
+
+      await vaultFactory.setDeployedVault(vault1, true);
+      await vaultFactory.setDeployedVault(vault2, true);
+
+      vaultAddress1 = await vault1.getAddress();
+      vaultAddress2 = await vault2.getAddress();
+    });
+
+    it("should correctly set vault name on the vault without the name", async () => {
+      const vaultNameCost = paymentTokenVaultNameCost * threeLetterFactor;
+
+      await paymentToken.mint(OWNER, vaultNameCost + paymentTokenSubscriptionCost);
+      await paymentToken
+        .connect(OWNER)
+        .approve(await subscriptionManager.getAddress(), vaultNameCost + paymentTokenSubscriptionCost);
+
+      await subscriptionManager.buySubscription(vaultAddress1, paymentToken, basePeriodDuration);
+
+      const signature = await getUpdateVaultNameSignature(subscriptionManager, OWNER, {
+        account: vaultAddress1.toString(),
+        vaultName: "abc",
+        nonce: 0n,
+      });
+
+      const tx = await updateVaultName(vaultAddress1, paymentToken, "abc", signature);
+
+      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(vaultAddress1, "abc");
+
+      expect(await subscriptionManager.getVault("abc")).to.be.eq(vaultAddress1);
+      expect(await subscriptionManager.getVaultName(vaultAddress1)).to.be.eq("abc");
+
+      await expect(tx).to.changeTokenBalances(
+        paymentToken,
+        [OWNER, subscriptionManager],
+        [-vaultNameCost, vaultNameCost],
+      );
+    });
+
+    it("should correctly update the vault name", async () => {
+      const vaultNameCost1 = paymentTokenVaultNameCost;
+      const vaultNameCost2 = paymentTokenVaultNameCost * threeLetterFactor;
+
+      const totalAmountToPay = vaultNameCost1 + vaultNameCost2 + paymentTokenSubscriptionCost;
+
+      await paymentToken.mint(OWNER, totalAmountToPay);
+      await paymentToken.connect(OWNER).approve(await subscriptionManager.getAddress(), totalAmountToPay);
+
+      await subscriptionManager.buySubscription(vaultAddress1, paymentToken, basePeriodDuration);
+
+      let signature = await getUpdateVaultNameSignature(subscriptionManager, OWNER, {
+        account: vaultAddress1.toString(),
+        vaultName: "abcdefg",
+        nonce: 0n,
+      });
+
+      let tx = await updateVaultName(vaultAddress1, paymentToken, "abcdefg", signature);
+
+      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(vaultAddress1, "abcdefg");
+
+      await expect(tx).to.changeTokenBalances(
+        paymentToken,
+        [OWNER, subscriptionManager],
+        [-vaultNameCost1, vaultNameCost1],
+      );
+
+      signature = await getUpdateVaultNameSignature(subscriptionManager, OWNER, {
+        account: vaultAddress1.toString(),
+        vaultName: "cba",
+        nonce: 1n,
+      });
+
+      tx = await updateVaultName(vaultAddress1, paymentToken, "cba", signature);
+
+      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(vaultAddress1, "cba");
+
+      expect(await subscriptionManager.getVault("cba")).to.be.eq(vaultAddress1);
+      expect(await subscriptionManager.getVaultName(vaultAddress1)).to.be.eq("cba");
+
+      await expect(tx).to.changeTokenBalances(
+        paymentToken,
+        [OWNER, subscriptionManager],
+        [-vaultNameCost2, vaultNameCost2],
+      );
+    });
+
+    it("should correctly update the vault name to already taken but available name", async () => {
+      const vaultNameCost = paymentTokenVaultNameCost * fourLetterFactor;
+
+      await paymentToken.mint(OWNER, vaultNameCost + paymentTokenSubscriptionCost);
+      await paymentToken.approve(subscriptionManager, vaultNameCost + paymentTokenSubscriptionCost);
+
+      const startTime = (await time.latest()) + 100;
+      const expectedEndTime = BigInt(startTime) + basePeriodDuration;
+
+      await time.setNextBlockTimestamp(startTime);
+      await subscriptionManager.buySubscription(vaultAddress1, paymentToken, basePeriodDuration);
+
+      let signature = await getUpdateVaultNameSignature(subscriptionManager, OWNER, {
+        account: vaultAddress1.toString(),
+        vaultName: "abcd",
+        nonce: 0n,
+      });
+      let tx = await updateVaultName(vaultAddress1, paymentToken, "abcd", signature);
+
+      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(vaultAddress1, "abcd");
+
+      expect(await subscriptionManager.isVaultNameAvailable("abcd")).to.be.false;
+
+      await time.increaseTo(expectedEndTime + vaultNameRetentionPeriod + 1n);
+
+      expect(await subscriptionManager.isVaultNameAvailable("abcd")).to.be.true;
+
+      await paymentToken.mint(FIRST, vaultNameCost + paymentTokenSubscriptionCost);
+      await paymentToken.connect(FIRST).approve(subscriptionManager, vaultNameCost + paymentTokenSubscriptionCost);
+
+      await subscriptionManager.connect(FIRST).buySubscription(vaultAddress2, paymentToken, basePeriodDuration);
+
+      signature = await getUpdateVaultNameSignature(subscriptionManager, FIRST, {
+        account: vaultAddress2.toString(),
+        vaultName: "abcd",
+        nonce: 0n,
+      });
+      tx = await updateVaultName(vaultAddress2, paymentToken, "abcd", signature);
+
+      await expect(tx)
+        .to.emit(subscriptionManager, "VaultNameReassigned")
+        .withArgs("abcd", vaultAddress1, vaultAddress2);
+      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(vaultAddress2, "abcd");
+
+      expect(await subscriptionManager.getVaultName(vaultAddress1)).to.be.eq("");
+
+      expect(await subscriptionManager.getVault("abcd")).to.be.eq(vaultAddress2);
+      expect(await subscriptionManager.getVaultName(vaultAddress2)).to.be.eq("abcd");
+    });
+
+    it("should get exception if the signer is not the vault owner", async () => {
+      await paymentToken.mint(OWNER, paymentTokenSubscriptionCost);
+      await paymentToken.connect(OWNER).approve(await subscriptionManager.getAddress(), paymentTokenSubscriptionCost);
+
+      await subscriptionManager.buySubscription(vaultAddress1, paymentToken, basePeriodDuration);
+
+      const signature = await getUpdateVaultNameSignature(subscriptionManager, FIRST, {
+        account: vaultAddress1.toString(),
+        vaultName: "abc",
+        nonce: 0n,
+      });
+
+      await expect(updateVaultName(vaultAddress1, paymentToken, "abc", signature)).to.be.revertedWithCustomError(
+        subscriptionManager,
+        "InvalidSignature",
+      );
+    });
+
+    it("should get exception if unavailable token is chosen to pay for the name", async () => {
+      const newToken = await ethers.deployContract("ERC20Mock", ["Test ERC20 2", "TT2", 18]);
+
+      await expect(updateVaultName(vaultAddress1, newToken, "abcd", "0x"))
+        .to.be.revertedWithCustomError(subscriptionManager, "NotAvailableForPayment")
+        .withArgs(await newToken.getAddress());
+
+      await expect(subscriptionManager["updateVaultName(address,address,string)"](vaultAddress1, newToken, "abcd"))
+        .to.be.revertedWithCustomError(subscriptionManager, "NotAvailableForPayment")
+        .withArgs(await newToken.getAddress());
+    });
+
+    it("should get exception if the account provided is not the vault", async () => {
+      await expect(updateVaultName(FIRST, paymentToken, "abc", "0x")).to.be.revertedWithCustomError(
+        subscriptionManager,
+        "NotAVault",
+      );
+
+      await expect(
+        subscriptionManager["updateVaultName(address,address,string)"](FIRST, paymentToken, "abc"),
+      ).to.be.revertedWithCustomError(subscriptionManager, "NotAVault");
+    });
+
+    it("should get exception if the provided name is the same as the current one", async () => {
+      const vaultNameCost = paymentTokenVaultNameCost * threeLetterFactor;
+
+      await paymentToken.mint(OWNER, vaultNameCost * 2n + paymentTokenSubscriptionCost);
+      await paymentToken
+        .connect(OWNER)
+        .approve(await subscriptionManager.getAddress(), vaultNameCost * 2n + paymentTokenSubscriptionCost);
+
+      await subscriptionManager.buySubscription(vaultAddress1, paymentToken, basePeriodDuration);
+
+      let signature = await getUpdateVaultNameSignature(subscriptionManager, OWNER, {
+        account: vaultAddress1.toString(),
+        vaultName: "123",
+        nonce: 0n,
+      });
+
+      await updateVaultName(vaultAddress1, paymentToken, "123", signature);
+
+      signature = await getUpdateVaultNameSignature(subscriptionManager, OWNER, {
+        account: vaultAddress1.toString(),
+        vaultName: "123",
+        nonce: 1n,
+      });
+
+      await expect(updateVaultName(vaultAddress1, paymentToken, "123", signature))
+        .to.be.revertedWithCustomError(subscriptionManager, "VaultNameUnchanged")
+        .withArgs("123");
+    });
+
+    it("should get exception if the name is too short", async () => {
+      let signature = await getUpdateVaultNameSignature(subscriptionManager, OWNER, {
+        account: vaultAddress1.toString(),
+        vaultName: "ab",
+        nonce: 0n,
+      });
+
+      await expect(updateVaultName(vaultAddress1, paymentToken, "ab", signature))
+        .to.be.revertedWithCustomError(subscriptionManager, "VaultNameTooShort")
+        .withArgs("ab");
+
+      signature = await getUpdateVaultNameSignature(subscriptionManager, OWNER, {
+        account: vaultAddress1.toString(),
+        vaultName: "",
+        nonce: 0n,
+      });
+
+      await expect(updateVaultName(vaultAddress1, paymentToken, "", signature))
+        .to.be.revertedWithCustomError(subscriptionManager, "VaultNameTooShort")
+        .withArgs("");
+    });
+
+    it("should get exception if the vault does not have an active subscription", async () => {
+      let signature = await getUpdateVaultNameSignature(subscriptionManager, OWNER, {
+        account: vaultAddress1.toString(),
+        vaultName: "abc",
+        nonce: 0n,
+      });
+
+      await expect(updateVaultName(vaultAddress1, paymentToken, "abc", signature))
+        .to.be.revertedWithCustomError(subscriptionManager, "InactiveVaultSubscription")
+        .withArgs(vaultAddress1);
+    });
+
+    it("should get exception if the name is unavailable", async () => {
+      const vaultNameCost = paymentTokenVaultNameCost * fourLetterFactor;
+
+      await paymentToken.mint(FIRST, vaultNameCost + paymentTokenSubscriptionCost);
+      await paymentToken.connect(FIRST).approve(subscriptionManager, vaultNameCost + paymentTokenSubscriptionCost);
+
+      const startTime = (await time.latest()) + 100;
+      const expectedEndTime = BigInt(startTime) + basePeriodDuration;
+
+      await time.setNextBlockTimestamp(startTime);
+      await subscriptionManager.connect(FIRST).buySubscription(vaultAddress2, paymentToken, basePeriodDuration);
+
+      let signature = await getUpdateVaultNameSignature(subscriptionManager, FIRST, {
+        account: vaultAddress2.toString(),
+        vaultName: "4321",
+        nonce: 0n,
+      });
+      await updateVaultName(vaultAddress2, paymentToken, "4321", signature);
+
+      await paymentToken.mint(OWNER, vaultNameCost + paymentTokenSubscriptionCost * 2n);
+      await paymentToken
+        .connect(OWNER)
+        .approve(await subscriptionManager.getAddress(), vaultNameCost + paymentTokenSubscriptionCost * 2n);
+
+      await subscriptionManager.connect(OWNER).buySubscription(vaultAddress1, paymentToken, basePeriodDuration * 2n);
+
+      await time.setNextBlockTimestamp(expectedEndTime + vaultNameRetentionPeriod);
+
+      signature = await getUpdateVaultNameSignature(subscriptionManager, OWNER, {
+        account: vaultAddress1.toString(),
+        vaultName: "4321",
+        nonce: 0n,
+      });
+
+      await expect(updateVaultName(vaultAddress1, paymentToken, "4321", signature))
+        .to.be.revertedWithCustomError(subscriptionManager, "VaultNameAlreadyTaken")
+        .withArgs("4321");
+    });
+
+    it("should get exception if the update function w/o signature is not called by the VaultFactory", async () => {
+      await expect(subscriptionManager["updateVaultName(address,address,string)"](vaultAddress1, paymentToken, "abc"))
+        .to.be.revertedWithCustomError(subscriptionManager, "NotAVaultFactory")
+        .withArgs(OWNER.address);
+    });
+  });
+
   describe("#getSubscriptionCost", () => {
     it("should correctly count subscription cost for different periods", async () => {
       let duration = basePeriodDuration * 3n;
@@ -656,6 +1010,7 @@ describe("VaultSubscriptionManager", () => {
         {
           paymentToken: await paymentToken.getAddress(),
           baseSubscriptionCost: newPaymentTokenSubscriptionCost,
+          baseVaultNameCost: paymentTokenVaultNameCost,
         },
       ]);
 
@@ -687,6 +1042,7 @@ describe("VaultSubscriptionManager", () => {
         {
           paymentToken: await paymentToken.getAddress(),
           baseSubscriptionCost: newPaymentTokenSubscriptionCost,
+          baseVaultNameCost: paymentTokenVaultNameCost,
         },
       ]);
 

@@ -30,3 +30,11 @@ export const BuySubscriptionTypes: Record<string, TypedDataField[]> = {
     { name: "nonce", type: "uint256" },
   ],
 };
+
+export const UpdateVaultNameTypes: Record<string, TypedDataField[]> = {
+  UpdateVaultName: [
+    { name: "account", type: "address" },
+    { name: "vaultName", type: "string" },
+    { name: "nonce", type: "uint256" },
+  ],
+};

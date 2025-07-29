@@ -82,7 +82,8 @@ contract VaultFactory is
     function deployVault(
         address masterKey_,
         address paymentToken_,
-        uint64 initialSubscriptionDuration_
+        uint64 initialSubscriptionDuration_,
+        string memory vaultName_
     ) external payable nonReentrant returns (address vaultAddr_) {
         VaultFactoryStorage storage $ = _getVaultFactoryStorage();
 
@@ -95,7 +96,12 @@ contract VaultFactory is
         $.deployedVaults[vaultAddr_] = true;
         $.vaultsByCreator[msg.sender].add(vaultAddr_);
 
-        _buyInitialSubscription(paymentToken_, vaultAddr_, initialSubscriptionDuration_);
+        _buyInitialSubscription(
+            paymentToken_,
+            vaultAddr_,
+            initialSubscriptionDuration_,
+            vaultName_
+        );
 
         emit VaultDeployed(msg.sender, vaultAddr_, masterKey_);
     }
@@ -167,7 +173,8 @@ contract VaultFactory is
     function _buyInitialSubscription(
         address paymentToken_,
         address vaultAddr_,
-        uint64 duration_
+        uint64 duration_,
+        string memory vaultName_
     ) internal {
         IVaultSubscriptionManager subscriptionManager_ = IVaultSubscriptionManager(
             _getVaultFactoryStorage().vaultSubscriptionManager
@@ -179,20 +186,35 @@ contract VaultFactory is
             duration_
         );
 
-        paymentToken_.receiveTokens(msg.sender, subscriptionCost_);
+        uint256 vaultNameCost_ = subscriptionManager_.getVaultNameCost(
+            address(paymentToken_),
+            vaultName_
+        );
 
-        uint256 valueAmount_;
+        uint256 totalCost_ = subscriptionCost_ + vaultNameCost_;
+
+        paymentToken_.receiveTokens(msg.sender, totalCost_);
+
+        uint256 subscriptionValueAmount_;
+        uint256 nameValueAmount_;
 
         if (paymentToken_.isNativeToken()) {
-            valueAmount_ = subscriptionCost_;
+            subscriptionValueAmount_ = subscriptionCost_;
+            nameValueAmount_ = vaultNameCost_;
         } else {
-            IERC20(paymentToken_).approve(address(subscriptionManager_), subscriptionCost_);
+            IERC20(paymentToken_).approve(address(subscriptionManager_), totalCost_);
         }
 
-        subscriptionManager_.buySubscription{value: valueAmount_}(
+        subscriptionManager_.buySubscription{value: subscriptionValueAmount_}(
             vaultAddr_,
             address(paymentToken_),
             duration_
+        );
+
+        subscriptionManager_.updateVaultName{value: nameValueAmount_}(
+            vaultAddr_,
+            address(paymentToken_),
+            vaultName_
         );
     }
 

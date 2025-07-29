@@ -1,5 +1,6 @@
 import {
   BuySubscriptionTypes,
+  UpdateVaultNameTypes,
   VaultUpdateEnabledStatusTypes,
   VaultUpdateMasterKeyTypes,
   VaultWithdrawTokensTypes,
@@ -30,6 +31,12 @@ export interface WithdrawTokensData {
 export interface BuySubscriptionData {
   sender: string;
   duration: bigint;
+  nonce: bigint;
+}
+
+export interface UpdateVaultNameData {
+  account: string;
+  vaultName: string;
   nonce: bigint;
 }
 
@@ -110,6 +117,20 @@ export async function getBuySubscriptionSignature(
   return await account.signTypedData(domain, BuySubscriptionTypes, {
     sender: data.sender,
     duration: data.duration,
+    nonce: data.nonce,
+  });
+}
+
+export async function getUpdateVaultNameSignature(
+  vaultSubscriptionManager: VaultSubscriptionManager,
+  account: SignerWithAddress,
+  data: UpdateVaultNameData,
+): Promise<string> {
+  const domain = await getDomain(vaultSubscriptionManager as unknown as EIP712Upgradeable);
+
+  return await account.signTypedData(domain, UpdateVaultNameTypes, {
+    account: data.account,
+    vaultName: data.vaultName,
     nonce: data.nonce,
   });
 }

@@ -7,6 +7,7 @@ export type DeployConfig = {
 
 export type VaultsConfig = {
   basePeriodDuration: bigint;
+  vaultNameRetentionPeriod: bigint;
   subscriptionSigner: string;
   paymentTokenConfigs: IVaultSubscriptionManager.PaymentTokenUpdateEntryStruct[];
   sbtTokenConfigs: IVaultSubscriptionManager.SBTTokenUpdateEntryStruct[];
@@ -15,6 +16,7 @@ export type VaultsConfig = {
 export type PaymentTokenConfig = {
   paymentToken: string;
   baseSubscriptionCost: bigint;
+  baseVaultNameCost: bigint;
 };
 
 export type SBTTokenConfig = {

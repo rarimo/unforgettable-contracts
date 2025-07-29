@@ -9,12 +9,5 @@ export = async (deployer: Deployer) => {
     await vaultImpl.getAddress(),
   ]);
 
-  await deployer.deployProxy(
-    VaultFactory__factory,
-    "ERC1967Proxy",
-    (implementationAddress: string): any[] => {
-      return [implementationAddress, vaultFactoryInitData];
-    },
-    { name: "VaultFactory" },
-  );
+  await deployer.deployERC1967Proxy(VaultFactory__factory, vaultFactoryInitData, { name: "VaultFactory" });
 };

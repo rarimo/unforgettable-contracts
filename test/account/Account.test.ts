@@ -1,14 +1,12 @@
-import { getRecoverAccountSignature, getRecoverOwnershipSignature } from "@/test/helpers/sign-utils";
+import { getRecoverAccountSignature } from "@/test/helpers/sign-utils";
 import EntryPointArtifact from "@account-abstraction/contracts/artifacts/EntryPoint.json";
 import {
   Account,
-  AccountFactory,
-  Account__factory,
+  AccountSubscriptionManager,
   ERC20Mock,
   IEntryPoint,
   RecoveryManagerMock,
   SignatureRecoveryStrategy,
-  SubscriptionManager,
 } from "@ethers-v6";
 import { wei } from "@scripts";
 import { Reverter } from "@test-helpers";
@@ -16,7 +14,6 @@ import { Reverter } from "@test-helpers";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
 import { expect } from "chai";
-import { AddressLike } from "ethers";
 import { ethers } from "hardhat";
 
 describe("Account", () => {
@@ -27,18 +24,13 @@ describe("Account", () => {
 
   const paymentTokenSubscriptionCost = wei(5);
 
-  const callGasLimit = 800_000n;
-  const verificationGasLimit = 800_000n;
-  const maxFeePerGas = ethers.parseUnits("10", "gwei");
-  const maxPriorityFeePerGas = ethers.parseUnits("5", "gwei");
-
   let OWNER: SignerWithAddress;
   let FIRST: SignerWithAddress;
   let SECOND: SignerWithAddress;
   let MASTER_KEY1: SignerWithAddress;
 
-  let subscriptionManagerImpl: SubscriptionManager;
-  let subscriptionManager: SubscriptionManager;
+  let subscriptionManagerImpl: AccountSubscriptionManager;
+  let subscriptionManager: AccountSubscriptionManager;
 
   let recoveryManager: RecoveryManagerMock;
   let recoveryStrategy: SignatureRecoveryStrategy;
@@ -46,56 +38,14 @@ describe("Account", () => {
   let paymentToken: ERC20Mock;
 
   let entryPoint: IEntryPoint;
-
-  let accountAddress: AddressLike;
-
-  let Account: Account__factory;
   let account: Account;
-  let accountFactory: AccountFactory;
-
-  function packTwoUint128(a, b) {
-    const maxUint128 = (1n << 128n) - 1n;
-
-    if (a > maxUint128 || b > maxUint128) {
-      throw new Error("Value exceeds uint128");
-    }
-
-    const packed = (a << 128n) + b;
-
-    return "0x" + packed.toString(16).padStart(64, "0");
-  }
-
-  async function getUserOp(callData: string = "0x") {
-    const accountGasLimits = packTwoUint128(callGasLimit, verificationGasLimit);
-    const gasFees = packTwoUint128(maxFeePerGas, maxPriorityFeePerGas);
-
-    const AccountFactory = await ethers.getContractFactory("AccountFactory");
-
-    const initCode =
-      (await ethers.provider.getCode(accountAddress)) === "0x"
-        ? (await accountFactory.getAddress()) +
-          AccountFactory.interface.encodeFunctionData("createAccount", [FIRST.address, 0]).slice(2)
-        : "0x";
-
-    return {
-      sender: accountAddress.toString(),
-      nonce: await entryPoint.getNonce(accountAddress, 0),
-      initCode: initCode,
-      callData: callData,
-      accountGasLimits: accountGasLimits,
-      preVerificationGas: 50_000n,
-      gasFees: gasFees,
-      paymasterAndData: "0x",
-      signature: "0x",
-    };
-  }
 
   before(async () => {
     [OWNER, FIRST, SECOND, MASTER_KEY1] = await ethers.getSigners();
 
     paymentToken = await ethers.deployContract("ERC20Mock", ["Test Token", "TT", 18]);
 
-    subscriptionManagerImpl = await ethers.deployContract("SubscriptionManager");
+    subscriptionManagerImpl = await ethers.deployContract("AccountSubscriptionManager");
     const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
       "initialize(uint64,address,(address,uint256)[],(address,uint64)[])",
       [
@@ -116,7 +66,7 @@ describe("Account", () => {
       subscriptionManagerInitData,
     ]);
     subscriptionManager = await ethers.getContractAt(
-      "SubscriptionManager",
+      "AccountSubscriptionManager",
       await subscriptionManagerProxy.getAddress(),
     );
 
@@ -129,7 +79,9 @@ describe("Account", () => {
     const EntryPointFactory = await ethers.getContractFactoryFromArtifact(EntryPointArtifact);
     entryPoint = (await EntryPointFactory.deploy()) as any;
 
-    accountFactory = await ethers.deployContract("AccountFactory", [entryPoint]);
+    account = await ethers.deployContract("Account");
+
+    await account.initialize(MASTER_KEY1);
 
     await paymentToken.mint(FIRST, initialTokensAmount);
     await paymentToken.mint(SECOND, initialTokensAmount);
@@ -138,22 +90,6 @@ describe("Account", () => {
   });
 
   beforeEach(async () => {
-    accountAddress = await accountFactory.getContractAddress(FIRST.address, 0);
-
-    Account = await ethers.getContractFactory("Account");
-
-    await entryPoint.depositTo(accountAddress, {
-      value: ethers.parseEther("100"),
-    });
-
-    const userOp = await getUserOp();
-
-    userOp.signature = await getRecoverOwnershipSignature(entryPoint, FIRST, userOp);
-
-    await entryPoint.handleOps([userOp], FIRST.address);
-
-    account = await ethers.getContractAt("Account", accountAddress);
-
     const accountRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY1.address]);
 
     const subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
@@ -168,20 +104,23 @@ describe("Account", () => {
       ],
     );
 
-    const subscribeCost = await recoveryManager.getSubscribeCost(subscribeData);
+    await paymentToken.connect(FIRST).transfer(account, paymentTokenSubscriptionCost);
 
-    await paymentToken.connect(FIRST).approve(account, subscribeCost[0]);
+    const approveData = paymentToken.interface.encodeFunctionData("approve", [
+      await recoveryManager.getAddress(),
+      paymentTokenSubscriptionCost,
+    ]);
 
-    await account.connect(FIRST).addRecoveryProvider(recoveryManager, subscribeData);
+    await account.connect(MASTER_KEY1).execute(paymentToken, 0, approveData);
+
+    await account.connect(MASTER_KEY1).addRecoveryProvider(recoveryManager, subscribeData);
   });
 
   afterEach(reverter.revert);
 
   describe("#recoverOwnership", () => {
     it("should recover ownership correctly", async () => {
-      expect(await account.owner()).to.be.eq(FIRST);
-
-      await paymentToken.connect(FIRST).approve(recoveryManager, paymentTokenSubscriptionCost);
+      expect(await account.trustedExecutor()).to.be.eq(MASTER_KEY1);
 
       let signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
         account: await account.getAddress(),
@@ -189,11 +128,11 @@ describe("Account", () => {
         nonce: 0n,
       });
 
-      const tx = await account.connect(OWNER).recoverOwnership(SECOND, recoveryManager, signature);
+      let tx = await account.connect(OWNER).recoverOwnership(SECOND, recoveryManager, signature);
 
-      await expect(tx).to.emit(account, "OwnershipRecovered").withArgs(FIRST.address, SECOND.address);
+      await expect(tx).to.emit(account, "OwnershipRecovered").withArgs(MASTER_KEY1.address, SECOND.address);
 
-      expect(await account.owner()).to.be.eq(SECOND);
+      expect(await account.trustedExecutor()).to.be.eq(SECOND);
 
       signature = await getRecoverAccountSignature(recoveryStrategy, OWNER, {
         account: await account.getAddress(),
@@ -204,6 +143,18 @@ describe("Account", () => {
       await expect(
         account.connect(FIRST).recoverOwnership(SECOND, recoveryManager, signature),
       ).to.be.revertedWithCustomError(recoveryStrategy, "RecoveryFailed");
+
+      await paymentToken.connect(FIRST).transfer(account, wei(10));
+
+      const transferData = paymentToken.interface.encodeFunctionData("transfer", [OWNER.address, wei(10)]);
+
+      await expect(account.connect(MASTER_KEY1).execute(paymentToken, 0, transferData))
+        .to.be.revertedWithCustomError(account, "InvalidExecutor")
+        .withArgs(MASTER_KEY1.address);
+
+      tx = await account.connect(SECOND).execute(paymentToken, 0, transferData);
+
+      await expect(tx).to.changeTokenBalances(paymentToken, [account, OWNER], [-wei(10), wei(10)]);
     });
   });
 });

@@ -1,9 +1,10 @@
 import { getRecoverAccountSignature } from "@/test/helpers/sign-utils";
-import { ERC20Mock, RecoveryManagerMock, SignatureRecoveryStrategy, SubscriptionManager } from "@ethers-v6";
+import { AccountSubscriptionManager, ERC20Mock, RecoveryManagerMock, SignatureRecoveryStrategy } from "@ethers-v6";
 import { wei } from "@scripts";
 import { Reverter } from "@test-helpers";
 
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 import { expect } from "chai";
 import { ZeroAddress } from "ethers";
@@ -22,8 +23,8 @@ describe("RecoveryManager", () => {
   let SECOND: SignerWithAddress;
   let MASTER_KEY1: SignerWithAddress;
 
-  let subscriptionManagerImpl: SubscriptionManager;
-  let subscriptionManager: SubscriptionManager;
+  let subscriptionManagerImpl: AccountSubscriptionManager;
+  let subscriptionManager: AccountSubscriptionManager;
 
   let recoveryManager: RecoveryManagerMock;
   let recoveryStrategy: SignatureRecoveryStrategy;
@@ -35,7 +36,7 @@ describe("RecoveryManager", () => {
 
     paymentToken = await ethers.deployContract("ERC20Mock", ["Test Token", "TT", 18]);
 
-    subscriptionManagerImpl = await ethers.deployContract("SubscriptionManager");
+    subscriptionManagerImpl = await ethers.deployContract("AccountSubscriptionManager");
     const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
       "initialize(uint64,address,(address,uint256)[],(address,uint64)[])",
       [
@@ -56,7 +57,7 @@ describe("RecoveryManager", () => {
       subscriptionManagerInitData,
     ]);
     subscriptionManager = await ethers.getContractAt(
-      "SubscriptionManager",
+      "AccountSubscriptionManager",
       await subscriptionManagerProxy.getAddress(),
     );
 
@@ -303,6 +304,52 @@ describe("RecoveryManager", () => {
         recoveryStrategy,
         "RecoveryFailed",
       );
+    });
+
+    it("should get exception if try to recover without recovery method set", async () => {
+      await paymentToken.connect(FIRST).approve(recoveryManager, paymentTokenSubscriptionCost * 3n);
+
+      const signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
+        account: FIRST.address,
+        newOwner: SECOND.address,
+        nonce: 0n,
+      });
+
+      await expect(recoveryManager.connect(FIRST).recover(SECOND.address, signature))
+        .to.be.revertedWithCustomError(recoveryManager, "RecoveryMethodNotSet")
+        .withArgs(FIRST.address);
+    });
+
+    it("should get exception if try to recover without active subscription", async () => {
+      await paymentToken.connect(SECOND).approve(recoveryManager, paymentTokenSubscriptionCost);
+
+      const accountRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY1.address]);
+
+      const subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes))"],
+        [
+          [
+            await subscriptionManager.getAddress(),
+            await paymentToken.getAddress(),
+            basePeriodDuration,
+            [0n, accountRecoveryData],
+          ],
+        ],
+      );
+
+      await recoveryManager.connect(SECOND).subscribe(subscribeData);
+
+      await time.increaseTo(BigInt(await time.latest()) + basePeriodDuration);
+
+      let signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
+        account: SECOND.address,
+        newOwner: OWNER.address,
+        nonce: 0n,
+      });
+
+      await expect(recoveryManager.connect(SECOND).recover(OWNER.address, signature))
+        .to.be.revertedWithCustomError(recoveryManager, "NoActiveSubscription")
+        .withArgs(await subscriptionManager.getAddress(), SECOND.address);
     });
   });
 });

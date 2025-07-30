@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-interface ISubscriptionManager {
+interface IAccountSubscriptionManager {
     struct PaymentTokenUpdateEntry {
         address paymentToken;
         uint256 baseSubscriptionCost;

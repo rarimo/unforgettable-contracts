@@ -1,13 +1,12 @@
 import {
   BuySubscriptionTypes,
   RecoverAccountTypes,
-  RecoverOwnershipTypes,
   UpdateVaultNameTypes,
   VaultUpdateEnabledStatusTypes,
   VaultUpdateMasterKeyTypes,
   VaultWithdrawTokensTypes,
 } from "@/test/helpers/eip712types";
-import { EIP712Upgradeable, IEntryPoint, SignatureRecoveryStrategy, Vault, VaultSubscriptionManager } from "@ethers-v6";
+import { EIP712Upgradeable, SignatureRecoveryStrategy, Vault, VaultSubscriptionManager } from "@ethers-v6";
 
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
@@ -46,17 +45,6 @@ export interface RecoverAccountData {
   account: string;
   newOwner: string;
   nonce: bigint;
-}
-
-export interface RecoverOwnershipData {
-  sender: string;
-  nonce: bigint;
-  initCode: string;
-  callData: string;
-  accountGasLimits: string;
-  preVerificationGas: bigint;
-  gasFees: string;
-  paymasterAndData: string;
 }
 
 export async function getDomain(contract: EIP712Upgradeable): Promise<TypedDataDomain> {
@@ -166,14 +154,4 @@ export async function getRecoverAccountSignature(
     newOwner: data.newOwner,
     nonce: data.nonce,
   });
-}
-
-export async function getRecoverOwnershipSignature(
-  entryPoint: IEntryPoint,
-  account: SignerWithAddress,
-  data: RecoverOwnershipData,
-): Promise<string> {
-  const domain = await getDomain(entryPoint as unknown as EIP712Upgradeable);
-
-  return await account.signTypedData(domain, RecoverOwnershipTypes, data);
 }

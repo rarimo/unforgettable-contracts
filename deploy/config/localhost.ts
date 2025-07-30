@@ -17,4 +17,15 @@ export const deployConfig: DeployConfig = {
     ],
     sbtTokenConfigs: [],
   },
+  accountSubscriptionManagerConfig: {
+    basePeriodDuration: 3600n * 24n * 30n,
+    subscriptionSigner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    paymentTokenConfigs: [
+      {
+        paymentToken: ETHER_ADDR,
+        baseSubscriptionCost: wei(1, 16),
+      },
+    ],
+    sbtTokenConfigs: [],
+  },
 };

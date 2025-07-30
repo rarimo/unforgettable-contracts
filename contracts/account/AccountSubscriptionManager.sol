@@ -13,14 +13,14 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 
 import {PERCENTAGE_100} from "@solarity/solidity-lib/utils/Globals.sol";
 
-import {ISubscriptionManager} from "./interfaces/ISubscriptionManager.sol";
-import {IBurnableSBT} from "./interfaces/tokens/IBurnableSBT.sol";
+import {IAccountSubscriptionManager} from "../interfaces/account/IAccountSubscriptionManager.sol";
+import {IBurnableSBT} from "../interfaces/tokens/IBurnableSBT.sol";
 
-import {TokensHelper} from "./libs/TokensHelper.sol";
-import {EIP712SignatureChecker} from "./libs/EIP712SignatureChecker.sol";
+import {TokensHelper} from "../libs/TokensHelper.sol";
+import {EIP712SignatureChecker} from "../libs/EIP712SignatureChecker.sol";
 
-contract SubscriptionManager is
-    ISubscriptionManager,
+contract AccountSubscriptionManager is
+    IAccountSubscriptionManager,
     OwnableUpgradeable,
     NoncesUpgradeable,
     ReentrancyGuardUpgradeable,

@@ -46,16 +46,3 @@ export const RecoverAccountTypes: Record<string, TypedDataField[]> = {
     { name: "nonce", type: "uint256" },
   ],
 };
-
-export const RecoverOwnershipTypes: Record<string, TypedDataField[]> = {
-  PackedUserOperation: [
-    { name: "sender", type: "address" },
-    { name: "nonce", type: "uint256" },
-    { name: "initCode", type: "bytes" },
-    { name: "callData", type: "bytes" },
-    { name: "accountGasLimits", type: "bytes32" },
-    { name: "preVerificationGas", type: "uint256" },
-    { name: "gasFees", type: "bytes32" },
-    { name: "paymasterAndData", type: "bytes" },
-  ],
-};

@@ -17,12 +17,11 @@ interface IRecoveryManager is IRecoveryProvider {
 
     error ZeroStrategyAddress();
     error InvalidStrategyStatus(StrategyStatus expectedStatus, StrategyStatus actualStatus);
+    error RecoveryMethodNotSet(address account);
 
     event SubscriptionManagerAdded(address indexed subscriptionManager);
     event SubscriptionManagerRemoved(address indexed subscriptionManager);
     event StrategyAdded(uint256 indexed strategyId);
     event StrategyDisabled(uint256 indexed strategyId);
     event StrategyEnabled(uint256 indexed strategyId);
-
-    function getSubscribeCost(bytes memory recoveryData_) external view returns (uint256, address);
 }

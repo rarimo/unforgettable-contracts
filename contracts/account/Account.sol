@@ -2,22 +2,27 @@
 pragma solidity ^0.8.28;
 
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
-import {SimpleAccount} from "@account-abstraction/contracts/accounts/SimpleAccount.sol";
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {AAccountRecovery} from "@solarity/solidity-lib/account-abstraction/AAccountRecovery.sol";
 
+import {Simple7702Account} from "./Simple7702Account.sol";
+
 import {IRecoveryManager} from "../interfaces/IRecoveryManager.sol";
 
-contract Account is SimpleAccount, AAccountRecovery {
+contract Account is Simple7702Account, AAccountRecovery {
     using SafeERC20 for IERC20;
 
-    constructor(IEntryPoint entryPoint_) SimpleAccount(entryPoint_) {}
+    error NotSelfOrTrustedExecutor(address account);
 
-    function initialize(address owner_) public override initializer {
-        super.initialize(owner_);
+    modifier onlySelfOrTrustedExecutor() {
+        require(
+            msg.sender == address(this) || msg.sender == trustedExecutor,
+            NotSelfOrTrustedExecutor(msg.sender)
+        );
+        _;
     }
 
     /**
@@ -26,22 +31,16 @@ contract Account is SimpleAccount, AAccountRecovery {
     function addRecoveryProvider(
         address provider_,
         bytes memory recoveryData_
-    ) external override onlyOwner {
-        (uint256 subscribeCost_, address paymentTokenAddr_) = IRecoveryManager(provider_)
-            .getSubscribeCost(recoveryData_);
-
-        if (paymentTokenAddr_ != address(0)) {
-            IERC20(paymentTokenAddr_).safeTransferFrom(msg.sender, address(this), subscribeCost_);
-            IERC20(paymentTokenAddr_).approve(provider_, subscribeCost_);
-        }
-
+    ) external override onlySelfOrTrustedExecutor {
         _addRecoveryProvider(provider_, recoveryData_);
     }
 
     /**
      * @inheritdoc AAccountRecovery
      */
-    function removeRecoveryProvider(address provider_) external override onlyOwner {
+    function removeRecoveryProvider(
+        address provider_
+    ) external override onlySelfOrTrustedExecutor {
         _removeRecoveryProvider(provider_);
     }
 
@@ -49,16 +48,16 @@ contract Account is SimpleAccount, AAccountRecovery {
      * @inheritdoc AAccountRecovery
      */
     function recoverOwnership(
-        address newOwner_,
+        address newTrustedExecutor_,
         address provider_,
         bytes memory proof_
     ) external override returns (bool) {
-        _validateRecovery(newOwner_, provider_, proof_);
+        _validateRecovery(newTrustedExecutor_, provider_, proof_);
 
-        address oldOwner_ = owner;
-        owner = newOwner_;
+        address oldTrustedExecutor_ = trustedExecutor;
+        trustedExecutor = newTrustedExecutor_;
 
-        emit OwnershipRecovered(oldOwner_, newOwner_);
+        emit OwnershipRecovered(oldTrustedExecutor_, newTrustedExecutor_);
 
         return true;
     }

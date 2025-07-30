@@ -112,12 +112,7 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
             );
         }
 
-        require(
-            ISubscriptionManager(subscribeData_.subscriptionManager).hasActiveSubscription(
-                msg.sender
-            ),
-            NoActiveSubscription(subscribeData_.subscriptionManager, msg.sender)
-        );
+        _checkActiveSubscription(subscribeData_.subscriptionManager, msg.sender);
 
         $.accountsRecoveryData[msg.sender].subscriptionManager = subscribeData_
             .subscriptionManager;
@@ -133,9 +128,16 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
     }
 
     function recover(address newOwner_, bytes memory proof_) external {
-        RecoveryMethod memory recoveryMethod_ = _getRecoveryManagerStorage()
-            .accountsRecoveryData[msg.sender]
-            .recoveryMethod;
+        RecoveryManagerStorage storage $ = _getRecoveryManagerStorage();
+
+        RecoveryMethod memory recoveryMethod_ = $.accountsRecoveryData[msg.sender].recoveryMethod;
+
+        require(recoveryMethod_.recoveryData.length > 0, RecoveryMethodNotSet(msg.sender));
+
+        _checkActiveSubscription(
+            $.accountsRecoveryData[msg.sender].subscriptionManager,
+            msg.sender
+        );
 
         IRecoveryStrategy(getStrategy(recoveryMethod_.strategyId)).recoverAccount(
             msg.sender,
@@ -151,21 +153,6 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
 
     function getRecoveryData(address account_) external view returns (bytes memory) {
         return abi.encode(_getRecoveryManagerStorage().accountsRecoveryData[account_]);
-    }
-
-    function getSubscribeCost(
-        bytes memory recoveryData_
-    ) external view returns (uint256, address) {
-        SubscribeData memory subscribeData_ = abi.decode(recoveryData_, (SubscribeData));
-
-        uint256 subscriptionCost_ = ISubscriptionManager(subscribeData_.subscriptionManager)
-            .getSubscriptionCost(
-                msg.sender,
-                subscribeData_.paymentTokenAddr,
-                subscribeData_.duration
-            );
-
-        return (subscriptionCost_, subscribeData_.paymentTokenAddr);
     }
 
     function subscriptionManagerExists(address subscriptionManager_) public view returns (bool) {
@@ -270,6 +257,16 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
         paymentToken_.approve(address(subscriptionManager_), subscriptionCostInTokens_);
 
         subscriptionManager_.buySubscription(account_, address(paymentToken_), duration_);
+    }
+
+    function _checkActiveSubscription(
+        address subscriptionManager_,
+        address account_
+    ) internal view {
+        require(
+            ISubscriptionManager(subscriptionManager_).hasActiveSubscription(account_),
+            NoActiveSubscription(subscriptionManager_, account_)
+        );
     }
 
     function _validateRecoveryMethod(RecoveryMethod memory recoveryMethod_) internal view {

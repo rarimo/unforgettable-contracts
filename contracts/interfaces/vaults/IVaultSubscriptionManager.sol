@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {ISubscriptionManager} from "../ISubscriptionManager.sol";
+import {ISubscriptionManager} from "./ISubscriptionManager.sol";
 
 interface IVaultSubscriptionManager is ISubscriptionManager {
     struct PaymentTokenUpdateEntry {

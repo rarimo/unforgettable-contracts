@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IRecoveryProvider} from "./erc7947/IRecoveryProvider.sol";
+import {IRecoveryProvider} from "@solarity/solidity-lib/interfaces/account-abstraction/IRecoveryProvider.sol";
 
 interface IRecoveryManager is IRecoveryProvider {
     enum StrategyStatus {
@@ -23,4 +23,6 @@ interface IRecoveryManager is IRecoveryProvider {
     event StrategyAdded(uint256 indexed strategyId);
     event StrategyDisabled(uint256 indexed strategyId);
     event StrategyEnabled(uint256 indexed strategyId);
+
+    function getSubscribeCost(bytes memory recoveryData_) external view returns (uint256, address);
 }

@@ -9,7 +9,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import {IRecoveryManager} from "./interfaces/IRecoveryManager.sol";
-import {ISubscriptionManager} from "./interfaces/ISubscriptionManager.sol";
+import {ISubscriptionManager} from "./interfaces/vaults/ISubscriptionManager.sol";
 import {IRecoveryStrategy} from "./interfaces/strategies/IRecoveryStrategy.sol";
 
 contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
@@ -23,7 +23,7 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
         address subscriptionManager;
         address paymentTokenAddr;
         uint64 duration;
-        RecoveryMethod[] recoveryMethods;
+        RecoveryMethod recoveryMethod;
     }
 
     struct RecoveryMethod {
@@ -31,15 +31,9 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
         bytes recoveryData;
     }
 
-    struct AccountRecoveryMethods {
-        uint256 nextRecoveryMethodId;
-        EnumerableSet.UintSet activeRecoveryMethods;
-        mapping(uint256 => RecoveryMethod) recoveryMethods;
-    }
-
     struct AccountRecoveryData {
-        EnumerableSet.AddressSet subscriptionManagers;
-        mapping(address => AccountRecoveryMethods) accountsRecoveryMethods;
+        address subscriptionManager;
+        RecoveryMethod recoveryMethod;
     }
 
     struct RecoveryManagerStorage {
@@ -47,6 +41,11 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
         EnumerableSet.AddressSet subscriptionManagers;
         mapping(uint256 => StrategyData) strategiesData;
         mapping(address => AccountRecoveryData) accountsRecoveryData;
+    }
+
+    struct RecoveryData {
+        bytes accountRecoveryData;
+        bytes recoveryProof;
     }
 
     error InvalidRecoveryStrategy(address recoveryStrategy);
@@ -102,9 +101,7 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
 
         _onlyExistingSubscriptionManager(subscribeData_.subscriptionManager);
 
-        for (uint256 i = 0; i < subscribeData_.recoveryMethods.length; i++) {
-            _validateRecoveryMethod(subscribeData_.recoveryMethods[i]);
-        }
+        _validateRecoveryMethod(subscribeData_.recoveryMethod);
 
         if (subscribeData_.paymentTokenAddr != address(0)) {
             _buySubscriptionFor(
@@ -121,13 +118,55 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
             ),
             NoActiveSubscription(subscribeData_.subscriptionManager, msg.sender)
         );
+
+        $.accountsRecoveryData[msg.sender].subscriptionManager = subscribeData_
+            .subscriptionManager;
+        $.accountsRecoveryData[msg.sender].recoveryMethod = subscribeData_.recoveryMethod;
+
+        emit AccountSubscribed(msg.sender);
     }
 
-    function unsubscribe() external {}
+    function unsubscribe() external {
+        delete _getRecoveryManagerStorage().accountsRecoveryData[msg.sender];
 
-    function recover(address newOwner_, bytes memory proof_) external {}
+        emit AccountUnsubscribed(msg.sender);
+    }
 
-    function getRecoveryData(address account_) external view returns (bytes memory) {}
+    function recover(address newOwner_, bytes memory proof_) external {
+        RecoveryMethod memory recoveryMethod_ = _getRecoveryManagerStorage()
+            .accountsRecoveryData[msg.sender]
+            .recoveryMethod;
+
+        IRecoveryStrategy(getStrategy(recoveryMethod_.strategyId)).recoverAccount(
+            msg.sender,
+            newOwner_,
+            abi.encode(
+                RecoveryData({
+                    accountRecoveryData: recoveryMethod_.recoveryData,
+                    recoveryProof: proof_
+                })
+            )
+        );
+    }
+
+    function getRecoveryData(address account_) external view returns (bytes memory) {
+        return abi.encode(_getRecoveryManagerStorage().accountsRecoveryData[account_]);
+    }
+
+    function getSubscribeCost(
+        bytes memory recoveryData_
+    ) external view returns (uint256, address) {
+        SubscribeData memory subscribeData_ = abi.decode(recoveryData_, (SubscribeData));
+
+        uint256 subscriptionCost_ = ISubscriptionManager(subscribeData_.subscriptionManager)
+            .getSubscriptionCost(
+                msg.sender,
+                subscribeData_.paymentTokenAddr,
+                subscribeData_.duration
+            );
+
+        return (subscriptionCost_, subscribeData_.paymentTokenAddr);
+    }
 
     function subscriptionManagerExists(address subscriptionManager_) public view returns (bool) {
         return _getRecoveryManagerStorage().subscriptionManagers.contains(subscriptionManager_);

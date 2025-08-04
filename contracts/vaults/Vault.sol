@@ -7,7 +7,7 @@ import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/crypt
 
 import {IVault} from "../interfaces/vaults/IVault.sol";
 import {IVaultFactory} from "../interfaces/vaults/IVaultFactory.sol";
-import {IVaultSubscriptionManager} from "../interfaces/vaults/IVaultSubscriptionManager.sol";
+import {ISubscriptionManager} from "../interfaces/subscription/ISubscriptionManager.sol";
 
 import {TokensHelper} from "../libs/TokensHelper.sol";
 import {EIP712SignatureChecker} from "../libs/EIP712SignatureChecker.sol";
@@ -97,7 +97,7 @@ contract Vault is IVault, NoncesUpgradeable, ReentrancyGuardUpgradeable, EIP712U
         );
         owner().checkSignature(withdrawHash_, signature_);
 
-        IVaultSubscriptionManager subscriptionManager_ = IVaultSubscriptionManager(
+        ISubscriptionManager subscriptionManager_ = ISubscriptionManager(
             $.vaultFactory.getVaultSubscriptionManager()
         );
         require(subscriptionManager_.hasActiveSubscription(address(this)), NoActiveSubscription());

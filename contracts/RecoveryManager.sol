@@ -9,7 +9,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import {IRecoveryManager} from "./interfaces/IRecoveryManager.sol";
-import {ISubscriptionManager} from "./interfaces/ISubscriptionManager.sol";
+import {ISubscriptionManager} from "./interfaces/subscription/ISubscriptionManager.sol";
 import {IRecoveryStrategy} from "./interfaces/strategies/IRecoveryStrategy.sol";
 
 contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {

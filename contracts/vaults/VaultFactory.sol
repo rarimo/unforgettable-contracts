@@ -16,7 +16,7 @@ import {Paginator} from "@solarity/solidity-lib/libs/arrays/Paginator.sol";
 
 import {IVault} from "../interfaces/vaults/IVault.sol";
 import {IVaultFactory} from "../interfaces/vaults/IVaultFactory.sol";
-import {IVaultSubscriptionManager} from "../interfaces/vaults/IVaultSubscriptionManager.sol";
+import {IVaultSubscriptionManager} from "../interfaces/subscription/IVaultSubscriptionManager.sol";
 
 import {TokensHelper} from "../libs/TokensHelper.sol";
 

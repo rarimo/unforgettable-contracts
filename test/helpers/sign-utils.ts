@@ -1,11 +1,12 @@
 import {
   BuySubscriptionTypes,
+  RecoverAccountTypes,
   UpdateVaultNameTypes,
   VaultUpdateEnabledStatusTypes,
   VaultUpdateMasterKeyTypes,
   VaultWithdrawTokensTypes,
 } from "@/test/helpers/eip712types";
-import { EIP712Upgradeable, Vault, VaultSubscriptionManager } from "@ethers-v6";
+import { EIP712Upgradeable, SignatureRecoveryStrategy, Vault, VaultSubscriptionManager } from "@ethers-v6";
 
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
@@ -37,6 +38,12 @@ export interface BuySubscriptionData {
 export interface UpdateVaultNameData {
   account: string;
   vaultName: string;
+  nonce: bigint;
+}
+
+export interface RecoverAccountData {
+  account: string;
+  newOwner: string;
   nonce: bigint;
 }
 
@@ -131,6 +138,20 @@ export async function getUpdateVaultNameSignature(
   return await account.signTypedData(domain, UpdateVaultNameTypes, {
     account: data.account,
     vaultName: data.vaultName,
+    nonce: data.nonce,
+  });
+}
+
+export async function getRecoverAccountSignature(
+  signatureRecoveryStrategy: SignatureRecoveryStrategy,
+  account: SignerWithAddress,
+  data: RecoverAccountData,
+): Promise<string> {
+  const domain = await getDomain(signatureRecoveryStrategy as unknown as EIP712Upgradeable);
+
+  return await account.signTypedData(domain, RecoverAccountTypes, {
+    account: data.account,
+    newOwner: data.newOwner,
     nonce: data.nonce,
   });
 }

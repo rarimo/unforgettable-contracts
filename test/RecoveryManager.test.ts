@@ -1,6 +1,6 @@
 import { getRecoverAccountSignature } from "@/test/helpers/sign-utils";
 import { AccountSubscriptionManager, ERC20Mock, RecoveryManager, SignatureRecoveryStrategy } from "@ethers-v6";
-import { wei } from "@scripts";
+import { ETHER_ADDR, wei } from "@scripts";
 import { Reverter } from "@test-helpers";
 
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
@@ -17,6 +17,7 @@ describe("RecoveryManager", () => {
   const basePeriodDuration = 3600n * 24n * 30n;
 
   const paymentTokenSubscriptionCost = wei(5);
+  const nativeSubscriptionCost = wei(1, 15);
 
   let OWNER: SignerWithAddress;
   let FIRST: SignerWithAddress;
@@ -36,16 +37,23 @@ describe("RecoveryManager", () => {
 
     paymentToken = await ethers.deployContract("ERC20Mock", ["Test Token", "TT", 18]);
 
+    recoveryManager = await ethers.deployContract("RecoveryManager");
+
     subscriptionManagerImpl = await ethers.deployContract("AccountSubscriptionManager");
     const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
-      "initialize(uint64,address,(address,uint256)[],(address,uint64)[])",
+      "initialize(address,uint64,address,(address,uint256)[],(address,uint64)[])",
       [
+        await recoveryManager.getAddress(),
         basePeriodDuration,
         OWNER.address,
         [
           {
             paymentToken: await paymentToken.getAddress(),
             baseSubscriptionCost: paymentTokenSubscriptionCost,
+          },
+          {
+            paymentToken: ETHER_ADDR,
+            baseSubscriptionCost: nativeSubscriptionCost,
           },
         ],
         [],
@@ -62,7 +70,6 @@ describe("RecoveryManager", () => {
     );
 
     recoveryStrategy = await ethers.deployContract("SignatureRecoveryStrategy");
-    recoveryManager = await ethers.deployContract("RecoveryManager");
 
     await recoveryStrategy.initialize(await recoveryManager.getAddress());
     await recoveryManager.initialize([await subscriptionManager.getAddress()], [await recoveryStrategy.getAddress()]);
@@ -260,6 +267,33 @@ describe("RecoveryManager", () => {
       expect(await recoveryManager.getRecoveryMethods(FIRST)).to.be.deep.eq([[0n, accountRecoveryData]]);
     });
 
+    it("should subscribe with native token correctly", async () => {
+      const accountRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY1.address]);
+
+      const subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
+        [[await subscriptionManager.getAddress(), ETHER_ADDR, basePeriodDuration, [[0n, accountRecoveryData]]]],
+      );
+
+      const tx = await recoveryManager.connect(OWNER).subscribe(subscribeData, {
+        value: nativeSubscriptionCost,
+      });
+
+      await expect(tx).to.emit(recoveryManager, "AccountSubscribed").withArgs(OWNER.address);
+      await expect(tx).to.changeEtherBalances(
+        [OWNER, subscriptionManager],
+        [-nativeSubscriptionCost, nativeSubscriptionCost],
+      );
+
+      const expectedRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(uint256,bytes)[]"],
+        [[[0, accountRecoveryData]]],
+      );
+
+      expect(await recoveryManager.getRecoveryData(OWNER)).to.be.eq(expectedRecoveryData);
+      expect(await recoveryManager.getRecoveryMethods(OWNER)).to.be.deep.eq([[0n, accountRecoveryData]]);
+    });
+
     it("should subscribe with existing subscription correctly", async () => {
       await paymentToken.connect(SECOND).approve(subscriptionManager, paymentTokenSubscriptionCost);
 
@@ -284,6 +318,52 @@ describe("RecoveryManager", () => {
 
       expect(await recoveryManager.getRecoveryData(SECOND)).to.be.eq(expectedRecoveryData);
       expect(await recoveryManager.getRecoveryMethods(SECOND)).to.be.deep.eq([[0n, accountRecoveryData]]);
+    });
+
+    it("should subscribe without buying subscription correctly", async () => {
+      const accountRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [SECOND.address]);
+
+      let subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
+        [[await subscriptionManager.getAddress(), ZeroAddress, basePeriodDuration, [[0n, accountRecoveryData]]]],
+      );
+
+      const tx = await recoveryManager.connect(SECOND).subscribe(subscribeData);
+
+      await expect(tx).to.emit(recoveryManager, "AccountSubscribed").withArgs(SECOND.address);
+
+      const expectedRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(uint256,bytes)[]"],
+        [[[0, accountRecoveryData]]],
+      );
+
+      expect(await recoveryManager.getRecoveryData(SECOND)).to.be.eq(expectedRecoveryData);
+      expect(await recoveryManager.getRecoveryMethods(SECOND)).to.be.deep.eq([[0n, accountRecoveryData]]);
+    });
+
+    it("should get exception if try to subscribe more than once", async () => {
+      await paymentToken.mint(OWNER, paymentTokenSubscriptionCost);
+      await paymentToken.connect(OWNER).approve(recoveryManager, paymentTokenSubscriptionCost);
+
+      const accountRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [FIRST.address]);
+
+      const subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
+        [
+          [
+            await subscriptionManager.getAddress(),
+            await paymentToken.getAddress(),
+            basePeriodDuration,
+            [[0n, accountRecoveryData]],
+          ],
+        ],
+      );
+
+      await recoveryManager.connect(OWNER).subscribe(subscribeData);
+
+      await expect(recoveryManager.connect(OWNER).subscribe(subscribeData))
+        .to.be.revertedWithCustomError(recoveryManager, "AccountAlreadySubscribed")
+        .withArgs(OWNER.address);
     });
 
     it("should get exception if try to subscribe with non-existing subscription manager", async () => {
@@ -346,19 +426,6 @@ describe("RecoveryManager", () => {
         "InvalidAccountRecoveryData",
       );
     });
-
-    it("should get exception if try to subscribe without paid subscription", async () => {
-      const accountRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [SECOND.address]);
-
-      let subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
-        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
-        [[await subscriptionManager.getAddress(), ZeroAddress, basePeriodDuration, [[0n, accountRecoveryData]]]],
-      );
-
-      await expect(recoveryManager.connect(FIRST).subscribe(subscribeData))
-        .to.be.revertedWithCustomError(recoveryManager, "NoActiveSubscription")
-        .withArgs(await subscriptionManager.getAddress(), FIRST.address);
-    });
   });
 
   describe("#unsubscribe", () => {
@@ -389,6 +456,53 @@ describe("RecoveryManager", () => {
 
       expect(await recoveryManager.getRecoveryData(SECOND)).to.be.eq(expectedRecoveryData);
       expect(await recoveryManager.getRecoveryMethods(SECOND)).to.be.deep.eq([]);
+    });
+
+    it("should get exception when try to unsubscribe before subscribing", async () => {
+      await expect(recoveryManager.connect(SECOND).unsubscribe())
+        .to.be.revertedWithCustomError(recoveryManager, "AccountNotSubscribed")
+        .withArgs(SECOND.address);
+    });
+  });
+
+  describe("#resubscribe", () => {
+    it("should resubscribe correctly", async () => {
+      let accountRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY1.address]);
+
+      let subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
+        [[await subscriptionManager.getAddress(), ZeroAddress, basePeriodDuration, [[0n, accountRecoveryData]]]],
+      );
+
+      await recoveryManager.connect(FIRST).subscribe(subscribeData);
+
+      let expectedRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(uint256,bytes)[]"],
+        [[[0, accountRecoveryData]]],
+      );
+
+      expect(await recoveryManager.getRecoveryData(FIRST)).to.be.eq(expectedRecoveryData);
+      expect(await recoveryManager.getRecoveryMethods(FIRST)).to.be.deep.eq([[0n, accountRecoveryData]]);
+
+      accountRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [OWNER.address]);
+
+      subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
+        [[await subscriptionManager.getAddress(), ZeroAddress, basePeriodDuration, [[0n, accountRecoveryData]]]],
+      );
+
+      const tx = await recoveryManager.connect(FIRST).resubscribe(subscribeData);
+
+      await expect(tx).to.emit(recoveryManager, "AccountUnsubscribed").withArgs(FIRST.address);
+      await expect(tx).to.emit(recoveryManager, "AccountSubscribed").withArgs(FIRST.address);
+
+      expectedRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(uint256,bytes)[]"],
+        [[[0, accountRecoveryData]]],
+      );
+
+      expect(await recoveryManager.getRecoveryData(FIRST)).to.be.eq(expectedRecoveryData);
+      expect(await recoveryManager.getRecoveryMethods(FIRST)).to.be.deep.eq([[0n, accountRecoveryData]]);
     });
   });
 
@@ -438,11 +552,11 @@ describe("RecoveryManager", () => {
 
       await expect(recoveryManager.connect(FIRST).recover(SECOND.address, recoveryProof)).to.be.revertedWithCustomError(
         recoveryStrategy,
-        "RecoveryFailed",
+        "InvalidSignature",
       );
     });
 
-    it("should get exception if try to recover with disabled strategy", async () => {
+    it("should recover with disabled strategy correctly", async () => {
       await paymentToken.connect(FIRST).approve(recoveryManager, paymentTokenSubscriptionCost);
 
       const accountRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY1.address]);
@@ -474,9 +588,7 @@ describe("RecoveryManager", () => {
 
       await recoveryManager.connect(OWNER).disableStrategy(0);
 
-      await expect(recoveryManager.connect(FIRST).recover(SECOND.address, recoveryProof))
-        .to.be.revertedWithCustomError(recoveryManager, "InvalidStrategyStatus")
-        .withArgs(1, 2);
+      await recoveryManager.connect(FIRST).recover(SECOND.address, recoveryProof);
     });
 
     it("should get exception if try to recover without recovery method set", async () => {

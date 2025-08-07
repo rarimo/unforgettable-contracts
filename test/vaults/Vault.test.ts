@@ -53,8 +53,9 @@ describe("Vault", () => {
 
     const subscriptionManagerImpl = await ethers.deployContract("VaultSubscriptionManager");
     const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
-      "initialize(uint64,uint64,address,(address,uint256)[],(address,uint256)[],(address,uint64)[])",
+      "initialize(address,uint64,uint64,address,(address,uint256)[],(address,uint256)[],(address,uint64)[])",
       [
+        OWNER.address,
         basePeriodDuration,
         3600n * 24n,
         SUBSCRIPTION_SIGNER.address,

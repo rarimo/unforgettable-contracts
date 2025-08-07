@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {SignatureChecker} from "@openzeppelin/contracts/utils/cryptography/SignatureChecker.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
+import {EIP712SignatureChecker} from "../libs/EIP712SignatureChecker.sol";
 import {ISignatureRecoveryStrategy} from "../interfaces/strategies/ISignatureRecoveryStrategy.sol";
 
 import {ARecoveryStrategy} from "./ARecoveryStrategy.sol";
@@ -13,11 +13,13 @@ contract SignatureRecoveryStrategy is
     ARecoveryStrategy,
     EIP712Upgradeable
 {
-    bytes32 public constant EMERGENCY_WITHDRAW_TYPEHASH =
+    using EIP712SignatureChecker for address;
+
+    bytes32 public constant SIGNATURE_RECOVERY_TYPEHASH =
         keccak256("SignatureRecovery(address account,address newOwner,uint256 nonce)");
 
     function initialize(address recoveryManagerAddr_) external initializer {
-        __EIP712_init("ATimeLockRecovery", "v1.0.0");
+        __EIP712_init("SignatureRecoveryStrategy", "v1.0.0");
         __ARecoveryStrategy_init(recoveryManagerAddr_);
     }
 
@@ -28,7 +30,7 @@ contract SignatureRecoveryStrategy is
     ) public view returns (bytes32) {
         return
             _hashTypedDataV4(
-                keccak256(abi.encode(EMERGENCY_WITHDRAW_TYPEHASH, account_, newOwner_, nonce_))
+                keccak256(abi.encode(SIGNATURE_RECOVERY_TYPEHASH, account_, newOwner_, nonce_))
             );
     }
 
@@ -37,18 +39,16 @@ contract SignatureRecoveryStrategy is
         address newOwner_,
         bytes memory recoveryDataRaw_
     ) internal override {
-        SignatureRecoveryData memory recoveryData_ = abi.decode(
+        (bytes memory accountRecoveryData_, bytes memory signature_) = abi.decode(
             recoveryDataRaw_,
-            (SignatureRecoveryData)
+            (bytes, bytes)
         );
-        address recoveryKey_ = abi.decode(recoveryData_.accountRecoveryData, (address));
+        address recoveryKey_ = abi.decode(accountRecoveryData_, (address));
 
         // Verify EIP712 signature
         bytes32 hash_ = hashSignatureRecovery(account_, newOwner_, _useNonce(account_));
-        require(
-            SignatureChecker.isValidSignatureNow(recoveryKey_, hash_, recoveryData_.signature),
-            RecoveryFailed()
-        );
+
+        recoveryKey_.checkSignature(hash_, signature_);
     }
 
     function _validateAccountRecoveryData(bytes memory recoveryData_) internal pure override {

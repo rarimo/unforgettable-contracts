@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import {IRecoveryProvider} from "@solarity/solidity-lib/interfaces/account-abstraction/IRecoveryProvider.sol";
+import {IRecoveryProvider} from "./eip7947/IRecoveryProvider.sol";
 
 interface IRecoveryManager is IRecoveryProvider {
     enum StrategyStatus {
@@ -35,17 +35,14 @@ interface IRecoveryManager is IRecoveryProvider {
         mapping(uint256 => RecoveryMethod) recoveryMethods;
     }
 
-    struct RecoveryData {
-        bytes accountRecoveryData;
-        bytes recoveryProof;
-    }
-
     error ZeroStrategyAddress();
     error InvalidStrategyStatus(StrategyStatus expectedStatus, StrategyStatus actualStatus);
     error InvalidRecoveryStrategy(address recoveryStrategy);
     error SubscriptionManagerDoesNotExist(address subscriptionManager);
     error NoActiveSubscription(address subscriptionManager, address account);
     error RecoveryMethodNotSet(address account, uint256 recoveryMethodId);
+    error AccountNotSubscribed(address account);
+    error AccountAlreadySubscribed(address account);
 
     event SubscriptionManagerAdded(address indexed subscriptionManager);
     event SubscriptionManagerRemoved(address indexed subscriptionManager);

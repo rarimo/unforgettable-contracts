@@ -12,11 +12,13 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {PERCENTAGE_100} from "@solarity/solidity-lib/utils/Globals.sol";
 
 import {ISubscriptionManager} from "../interfaces/subscription/ISubscriptionManager.sol";
-
 import {TokensHelper} from "../libs/TokensHelper.sol";
+
+import {BaseSubscriptionModule} from "./modules/BaseSubscriptionModule.sol";
 
 contract BaseSubscriptionManager is
     ISubscriptionManager,
+    BaseSubscriptionModule,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
     UUPSUpgradeable
@@ -28,18 +30,22 @@ contract BaseSubscriptionManager is
         keccak256("unforgettable.contract.base.subscription.manager.storage");
 
     struct BaseSubscriptionManagerStorage {
+        address recoveryManager;
         uint64 basePeriodDuration;
         // TokensSettings
         EnumerableSet.AddressSet paymentTokens;
         mapping(address => PaymentTokenSettings) paymentTokensSettings;
         // Subscription duration factors
         mapping(uint64 => uint256) subscriptionDurationFactors;
-        // Accounts subscription data
-        mapping(address => AccountSubscriptionData) accountsSubscriptionData;
     }
 
     modifier onlyAvailableForPayment(address token_) {
         _onlyAvailableForPayment(token_);
+        _;
+    }
+
+    modifier onlyRecoveryManager() {
+        _onlyRecoveryManager();
         _;
     }
 
@@ -60,11 +66,14 @@ contract BaseSubscriptionManager is
     }
 
     function __BaseSubscriptionManager_init(
+        address recoveryManager_,
         uint64 basePeriodDuration_,
         PaymentTokenUpdateEntry[] calldata paymentTokenEntries_
     ) public onlyInitializing {
         __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
+
+        _setRecoveryManager(recoveryManager_);
 
         _setBasePeriodDuration(basePeriodDuration_);
 
@@ -114,6 +123,17 @@ contract BaseSubscriptionManager is
         emit TokensWithdrawn(tokenAddr_, to_, amount_);
     }
 
+    function activateSubscription(address account_) external onlyRecoveryManager {
+        require(!hasSubscription(account_), AccountAlreadyActivated(account_));
+
+        AccountSubscriptionData storage accountData = _getAccountSubscriptionData(account_);
+
+        accountData.startTime = uint64(block.timestamp);
+        accountData.endTime = uint64(block.timestamp);
+
+        emit AccountActivated(account_, block.timestamp);
+    }
+
     function buySubscription(
         address account_,
         address token_,
@@ -140,6 +160,10 @@ contract BaseSubscriptionManager is
         return ERC1967Utils.getImplementation();
     }
 
+    function getRecoveryManager() external view returns (address) {
+        return _getBaseSubscriptionManagerStorage().recoveryManager;
+    }
+
     function getSubscriptionDurationFactor(uint64 duration_) external view returns (uint256) {
         return _getBaseSubscriptionManagerStorage().subscriptionDurationFactors[duration_];
     }
@@ -155,9 +179,7 @@ contract BaseSubscriptionManager is
         address account_,
         address token_
     ) public view returns (uint256) {
-        BaseSubscriptionManagerStorage storage $ = _getBaseSubscriptionManagerStorage();
-
-        uint256 accountSavedCost_ = $.accountsSubscriptionData[account_].accountSubscriptionCosts[
+        uint256 accountSavedCost_ = _getAccountSubscriptionData(account_).accountSubscriptionCosts[
             token_
         ];
         uint256 currentCost_ = getTokenBaseSubscriptionCost(token_);
@@ -196,17 +218,6 @@ contract BaseSubscriptionManager is
         }
     }
 
-    function getAccountSubscriptionEndTime(address account_) public view returns (uint64) {
-        AccountSubscriptionData storage accountData = _getBaseSubscriptionManagerStorage()
-            .accountsSubscriptionData[account_];
-
-        if (accountData.startTime == 0) {
-            return uint64(block.timestamp);
-        }
-
-        return accountData.endTime;
-    }
-
     function isAvailableForPayment(address token_) public view returns (bool) {
         return
             _getBaseSubscriptionManagerStorage()
@@ -214,18 +225,12 @@ contract BaseSubscriptionManager is
                 .isAvailableForPayment;
     }
 
-    function hasActiveSubscription(address account_) public view returns (bool) {
-        AccountSubscriptionData storage accountData = _getBaseSubscriptionManagerStorage()
-            .accountsSubscriptionData[account_];
+    function _setRecoveryManager(address newRecoveryManager_) internal {
+        _checkAddress(newRecoveryManager_);
 
-        return block.timestamp < accountData.endTime;
-    }
+        _getBaseSubscriptionManagerStorage().recoveryManager = newRecoveryManager_;
 
-    function hasSubscriptionDebt(address account_) public view returns (bool) {
-        AccountSubscriptionData storage accountData = _getBaseSubscriptionManagerStorage()
-            .accountsSubscriptionData[account_];
-
-        return block.timestamp >= accountData.endTime && accountData.startTime > 0;
+        emit RecoveryManagerUpdated(newRecoveryManager_);
     }
 
     function _setBasePeriodDuration(uint64 newBasePeriodDuration_) internal {
@@ -271,8 +276,7 @@ contract BaseSubscriptionManager is
     }
 
     function _updateAccountSubscriptionCost(address account_, address token_) internal {
-        AccountSubscriptionData storage accountData = _getBaseSubscriptionManagerStorage()
-            .accountsSubscriptionData[account_];
+        AccountSubscriptionData storage accountData = _getAccountSubscriptionData(account_);
 
         if (accountData.accountSubscriptionCosts[token_] == 0) {
             uint256 baseTokenSubscriptionCost_ = getTokenBaseSubscriptionCost(token_);
@@ -298,22 +302,6 @@ contract BaseSubscriptionManager is
         emit SubscriptionBoughtWithToken(token_, msg.sender, totalCost_);
     }
 
-    function _extendSubscription(address account_, uint64 duration_) internal {
-        AccountSubscriptionData storage accountData = _getBaseSubscriptionManagerStorage()
-            .accountsSubscriptionData[account_];
-
-        uint64 subscriptionEndTime_ = getAccountSubscriptionEndTime(account_);
-        uint64 newEndTime_ = subscriptionEndTime_ + duration_;
-
-        if (accountData.startTime == 0) {
-            accountData.startTime = uint64(block.timestamp);
-        }
-
-        accountData.endTime = newEndTime_;
-
-        emit SubscriptionExtended(account_, duration_, newEndTime_);
-    }
-
     // solhint-disable-next-line no-empty-blocks
     function _authorizeUpgrade(address newImplementation_) internal override onlyOwner {}
 
@@ -321,7 +309,9 @@ contract BaseSubscriptionManager is
         require(isAvailableForPayment(token_), NotAvailableForPayment(token_));
     }
 
-    function _checkAddress(address addr_) internal pure {
-        require(addr_ != address(0), ZeroAddr());
+    function _onlyRecoveryManager() internal view {
+        BaseSubscriptionManagerStorage storage $ = _getBaseSubscriptionManagerStorage();
+
+        require(msg.sender == $.recoveryManager, NotARecoveryManager(msg.sender));
     }
 }

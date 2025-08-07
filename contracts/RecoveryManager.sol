@@ -3,7 +3,6 @@ pragma solidity ^0.8.28;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
@@ -11,9 +10,11 @@ import {IRecoveryManager} from "./interfaces/IRecoveryManager.sol";
 import {ISubscriptionManager} from "./interfaces/subscription/ISubscriptionManager.sol";
 import {IRecoveryStrategy} from "./interfaces/strategies/IRecoveryStrategy.sol";
 
+import {TokensHelper} from "./libs/TokensHelper.sol";
+
 contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
     using EnumerableSet for *;
-    using SafeERC20 for IERC20;
+    using TokensHelper for address;
 
     bytes32 public constant RECOVERY_MANAGER_STORAGE_SLOT =
         keccak256("unforgettable.contract.recovery.manager.storage");
@@ -66,51 +67,18 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
         _enableStrategy(strategyId_);
     }
 
-    function subscribe(bytes memory recoveryData_) external {
-        // Make payable?
-        RecoveryManagerStorage storage $ = _getRecoveryManagerStorage();
-
-        SubscribeData memory subscribeData_ = abi.decode(recoveryData_, (SubscribeData));
-
-        _onlyExistingSubscriptionManager(subscribeData_.subscriptionManager);
-
-        for (uint256 i = 0; i < subscribeData_.recoveryMethods.length; i++) {
-            _validateRecoveryMethod(subscribeData_.recoveryMethods[i]);
-        }
-
-        if (subscribeData_.paymentTokenAddr != address(0)) {
-            _buySubscriptionFor(
-                msg.sender,
-                ISubscriptionManager(subscribeData_.subscriptionManager),
-                IERC20(subscribeData_.paymentTokenAddr),
-                subscribeData_.duration
-            );
-        }
-
-        _checkActiveSubscription(subscribeData_.subscriptionManager, msg.sender);
-
-        AccountRecoveryData storage recoveryData = $.accountsRecoveryData[msg.sender];
-
-        uint256 recoveryMethodsCount_ = subscribeData_.recoveryMethods.length;
-
-        uint256 firstRecoveryMethodId_ = recoveryData.nextRecoveryMethodId;
-        for (uint256 i = 0; i < recoveryMethodsCount_; i++) {
-            uint256 newRecoveryMethodId_ = firstRecoveryMethodId_ + i;
-
-            recoveryData.activeRecoveryMethods.add(newRecoveryMethodId_);
-
-            recoveryData.recoveryMethods[newRecoveryMethodId_] = subscribeData_.recoveryMethods[i];
-        }
-
-        recoveryData.nextRecoveryMethodId = firstRecoveryMethodId_ + recoveryMethodsCount_;
-
-        emit AccountSubscribed(msg.sender);
+    function subscribe(bytes memory recoveryData_) external payable {
+        _subscribe(recoveryData_);
     }
 
     function unsubscribe() external {
-        delete _getRecoveryManagerStorage().accountsRecoveryData[msg.sender];
+        _unsubscribe();
+    }
 
-        emit AccountUnsubscribed(msg.sender);
+    function resubscribe(bytes memory recoveryData_) external payable {
+        _unsubscribe();
+
+        _subscribe(recoveryData_);
     }
 
     function recover(address newOwner_, bytes memory proof_) external {
@@ -129,24 +97,16 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
         AccountRecoveryData storage recoveryData = $.accountsRecoveryData[msg.sender];
 
         require(
-            recoveryData.activeRecoveryMethods.length() > 0 &&
-                recoveryData.activeRecoveryMethods.contains(recoveryMethodId_),
+            recoveryData.activeRecoveryMethods.contains(recoveryMethodId_),
             RecoveryMethodNotSet(msg.sender, recoveryMethodId_)
         );
 
         RecoveryMethod memory recoveryMethod_ = recoveryData.recoveryMethods[recoveryMethodId_];
 
-        _hasStrategyStatus(recoveryMethod_.strategyId, StrategyStatus.Active);
-
         IRecoveryStrategy(getStrategy(recoveryMethod_.strategyId)).recoverAccount(
             msg.sender,
             newOwner_,
-            abi.encode(
-                RecoveryData({
-                    accountRecoveryData: recoveryMethod_.recoveryData,
-                    recoveryProof: recoveryProof_
-                })
-            )
+            abi.encode(recoveryMethod_.recoveryData, recoveryProof_)
         );
     }
 
@@ -257,22 +217,97 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
         emit StrategyEnabled(strategyId_);
     }
 
+    function _subscribe(bytes memory recoveryData_) internal {
+        AccountRecoveryData storage recoveryData = _getRecoveryManagerStorage()
+            .accountsRecoveryData[msg.sender];
+
+        require(recoveryData.nextRecoveryMethodId == 0, AccountAlreadySubscribed(msg.sender));
+
+        SubscribeData memory subscribeData_ = abi.decode(recoveryData_, (SubscribeData));
+
+        _onlyExistingSubscriptionManager(subscribeData_.subscriptionManager);
+
+        for (uint256 i = 0; i < subscribeData_.recoveryMethods.length; i++) {
+            _validateRecoveryMethod(subscribeData_.recoveryMethods[i]);
+        }
+
+        ISubscriptionManager subscriptionManager_ = ISubscriptionManager(
+            subscribeData_.subscriptionManager
+        );
+
+        if (!subscriptionManager_.hasSubscription(msg.sender)) {
+            subscriptionManager_.activateSubscription(msg.sender);
+        }
+
+        if (subscribeData_.paymentTokenAddr != address(0)) {
+            _buySubscriptionFor(
+                msg.sender,
+                subscriptionManager_,
+                subscribeData_.paymentTokenAddr,
+                subscribeData_.duration
+            );
+        }
+
+        uint256 recoveryMethodsCount_ = subscribeData_.recoveryMethods.length;
+
+        uint256 firstRecoveryMethodId_ = recoveryData.nextRecoveryMethodId;
+        for (uint256 i = 0; i < recoveryMethodsCount_; i++) {
+            uint256 newRecoveryMethodId_ = firstRecoveryMethodId_ + i;
+
+            recoveryData.activeRecoveryMethods.add(newRecoveryMethodId_);
+
+            recoveryData.recoveryMethods[newRecoveryMethodId_] = subscribeData_.recoveryMethods[i];
+        }
+
+        recoveryData.nextRecoveryMethodId = firstRecoveryMethodId_ + recoveryMethodsCount_;
+
+        emit AccountSubscribed(msg.sender);
+    }
+
+    function _unsubscribe() internal {
+        RecoveryManagerStorage storage $ = _getRecoveryManagerStorage();
+
+        AccountRecoveryData storage recoveryData = $.accountsRecoveryData[msg.sender];
+
+        require(recoveryData.nextRecoveryMethodId != 0, AccountNotSubscribed(msg.sender));
+
+        recoveryData.activeRecoveryMethods.clear();
+
+        delete $.accountsRecoveryData[msg.sender];
+
+        emit AccountUnsubscribed(msg.sender);
+    }
+
     function _buySubscriptionFor(
         address account_,
         ISubscriptionManager subscriptionManager_,
-        IERC20 paymentToken_,
+        address paymentToken_,
         uint64 duration_
     ) internal {
         uint256 subscriptionCostInTokens_ = subscriptionManager_.getSubscriptionCost(
             account_,
-            address(paymentToken_),
+            paymentToken_,
             duration_
         );
 
-        paymentToken_.safeTransferFrom(account_, address(this), subscriptionCostInTokens_);
-        paymentToken_.approve(address(subscriptionManager_), subscriptionCostInTokens_);
+        paymentToken_.receiveTokens(msg.sender, subscriptionCostInTokens_);
 
-        subscriptionManager_.buySubscription(account_, address(paymentToken_), duration_);
+        uint256 valueAmount_;
+
+        if (paymentToken_.isNativeToken()) {
+            valueAmount_ = subscriptionCostInTokens_;
+        } else {
+            IERC20(paymentToken_).approve(
+                address(subscriptionManager_),
+                subscriptionCostInTokens_
+            );
+        }
+
+        subscriptionManager_.buySubscription{value: valueAmount_}(
+            account_,
+            address(paymentToken_),
+            duration_
+        );
     }
 
     function _checkActiveSubscription(

@@ -8,6 +8,8 @@ import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/crypt
 
 import {PERCENTAGE_100} from "@solarity/solidity-lib/utils/Globals.sol";
 
+import {BaseSubscriptionModule} from "./BaseSubscriptionModule.sol";
+
 import {IVault} from "../../interfaces/vaults/IVault.sol";
 import {IVaultFactory} from "../../interfaces/vaults/IVaultFactory.sol";
 import {IVaultNameSubscriptionModule} from "../../interfaces/subscription/modules/IVaultNameSubscriptionModule.sol";
@@ -15,11 +17,9 @@ import {IVaultNameSubscriptionModule} from "../../interfaces/subscription/module
 import {TokensHelper} from "../../libs/TokensHelper.sol";
 import {EIP712SignatureChecker} from "../../libs/EIP712SignatureChecker.sol";
 
-import {BaseSubscriptionManager} from "../BaseSubscriptionManager.sol";
-
-contract VaultNameSubscriptionModule is
+abstract contract VaultNameSubscriptionModule is
     IVaultNameSubscriptionModule,
-    BaseSubscriptionManager,
+    BaseSubscriptionModule,
     NoncesUpgradeable,
     EIP712Upgradeable
 {
@@ -65,53 +65,10 @@ contract VaultNameSubscriptionModule is
         VaultPaymentTokenUpdateEntry[] calldata vaultPaymentTokenEntries_
     ) public onlyInitializing {
         __EIP712_init("VaultNameSubscriptionModule", "v1.0.0");
-        __ReentrancyGuard_init();
 
         _setVaultNameRetentionPeriod(vaultNameRetentionPeriod_);
 
         _updateVaultPaymentTokens(vaultPaymentTokenEntries_);
-    }
-
-    function secondStepInitialize(address vaultFactoryAddr_) external onlyOwner reinitializer(2) {
-        _getVaultNameSubscriptionModuleStorage().vaultFactory = IVaultFactory(vaultFactoryAddr_);
-    }
-
-    function setVaultNameRetentionPeriod(uint64 newVaultNameRetentionPeriod_) external onlyOwner {
-        _setVaultNameRetentionPeriod(newVaultNameRetentionPeriod_);
-    }
-
-    function updateVaultPaymentTokens(
-        VaultPaymentTokenUpdateEntry[] calldata vaultPaymentTokenEntries_
-    ) external onlyOwner {
-        _updateVaultPaymentTokens(vaultPaymentTokenEntries_);
-    }
-
-    function updateVaultName(
-        address account_,
-        address token_,
-        string memory vaultName_,
-        bytes memory signature_
-    ) external payable onlyAvailableForPayment(token_) onlyVault(account_) nonReentrant {
-        uint256 currentNonce_ = _useNonce(account_);
-        bytes32 updateVaultNameHash_ = hashUpdateVaultName(account_, vaultName_, currentNonce_);
-
-        address vaultOwner_ = IVault(account_).owner();
-        vaultOwner_.checkSignature(updateVaultNameHash_, signature_);
-
-        _updateVaultName(account_, token_, vaultOwner_, vaultName_);
-    }
-
-    function updateVaultName(
-        address account_,
-        address token_,
-        string memory vaultName_
-    ) external payable onlyAvailableForPayment(token_) onlyVault(account_) nonReentrant {
-        require(
-            address(_getVaultNameSubscriptionModuleStorage().vaultFactory) == msg.sender,
-            NotAVaultFactory(msg.sender)
-        );
-
-        _updateVaultName(account_, token_, msg.sender, vaultName_);
     }
 
     function getVaultNameRetentionPeriod() external view returns (uint64) {
@@ -179,6 +136,10 @@ contract VaultNameSubscriptionModule is
         return hasSubscriptionDebt(previousVault_) && retentionPeriodPassed_;
     }
 
+    function _secondStepInitialize(address vaultFactoryAddr_) internal {
+        _getVaultNameSubscriptionModuleStorage().vaultFactory = IVaultFactory(vaultFactoryAddr_);
+    }
+
     function _setVaultNameRetentionPeriod(uint64 newVaultNameRetentionPeriod_) internal {
         _getVaultNameSubscriptionModuleStorage()
             .vaultNameRetentionPeriod = newVaultNameRetentionPeriod_;
@@ -206,6 +167,34 @@ contract VaultNameSubscriptionModule is
     }
 
     function _updateVaultName(
+        address account_,
+        address token_,
+        string memory vaultName_,
+        bytes memory signature_
+    ) internal {
+        uint256 currentNonce_ = _useNonce(account_);
+        bytes32 updateVaultNameHash_ = hashUpdateVaultName(account_, vaultName_, currentNonce_);
+
+        address vaultOwner_ = IVault(account_).owner();
+        vaultOwner_.checkSignature(updateVaultNameHash_, signature_);
+
+        _updateVaultNameInternal(account_, token_, vaultOwner_, vaultName_);
+    }
+
+    function _updateVaultName(
+        address account_,
+        address token_,
+        string memory vaultName_
+    ) internal {
+        require(
+            address(_getVaultNameSubscriptionModuleStorage().vaultFactory) == msg.sender,
+            NotAVaultFactory(msg.sender)
+        );
+
+        _updateVaultNameInternal(account_, token_, msg.sender, vaultName_);
+    }
+
+    function _updateVaultNameInternal(
         address account_,
         address token_,
         address payer_,

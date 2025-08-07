@@ -1,12 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+
+import {BaseSubscriptionModule} from "./BaseSubscriptionModule.sol";
+
 import {IBurnableSBT} from "../../interfaces/tokens/IBurnableSBT.sol";
 import {ISBTSubscriptionModule} from "../../interfaces/subscription/modules/ISBTSubscriptionModule.sol";
 
-import {BaseSubscriptionManager} from "../BaseSubscriptionManager.sol";
-
-contract SBTSubscriptionModule is ISBTSubscriptionModule, BaseSubscriptionManager {
+abstract contract SBTSubscriptionModule is
+    ISBTSubscriptionModule,
+    BaseSubscriptionModule,
+    Initializable
+{
     bytes32 public constant SBT_SUBSCRIPTION_MODULE_STORAGE_SLOT =
         keccak256("unforgettable.contract.sbt.subscription.module.storage");
 
@@ -35,18 +41,6 @@ contract SBTSubscriptionModule is ISBTSubscriptionModule, BaseSubscriptionManage
         SBTTokenUpdateEntry[] calldata sbtTokenEntries_
     ) public onlyInitializing {
         _updateSBTTokens(sbtTokenEntries_);
-    }
-
-    function updateSBTTokens(SBTTokenUpdateEntry[] calldata sbtTokenEntries_) external onlyOwner {
-        _updateSBTTokens(sbtTokenEntries_);
-    }
-
-    function buySubscriptionWithSBT(
-        address account_,
-        address sbtTokenAddr_,
-        uint256 tokenId_
-    ) external virtual onlySupportedSBT(sbtTokenAddr_) {
-        _buySubscriptionWithSBT(account_, sbtTokenAddr_, tokenId_);
     }
 
     function isSupportedSBT(address sbtToken_) public view returns (bool) {

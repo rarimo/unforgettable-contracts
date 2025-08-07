@@ -1,4 +1,4 @@
-import { ERC20Mock, SBTMock, VaultFactoryMock, VaultSubscriptionManager } from "@ethers-v6";
+import { ERC20Mock, RecoveryManagerMock, SBTMock, VaultFactoryMock, VaultSubscriptionManager } from "@ethers-v6";
 import { ETHER_ADDR, PERCENTAGE_100, PRECISION, wei } from "@scripts";
 import { Reverter } from "@test-helpers";
 
@@ -38,6 +38,7 @@ describe("VaultSubscriptionManager", () => {
   let vaultFactory: VaultFactoryMock;
   let subscriptionManagerImpl: VaultSubscriptionManager;
   let subscriptionManager: VaultSubscriptionManager;
+  let recoveryManager: RecoveryManagerMock;
 
   let paymentToken: ERC20Mock;
   let sbtToken: SBTMock;
@@ -52,10 +53,13 @@ describe("VaultSubscriptionManager", () => {
 
     vaultFactory = await ethers.deployContract("VaultFactoryMock");
 
+    recoveryManager = await ethers.deployContract("RecoveryManagerMock");
+
     subscriptionManagerImpl = await ethers.deployContract("VaultSubscriptionManager");
     const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
-      "initialize(uint64,uint64,address,(address,uint256)[],(address,uint256)[],(address,uint64)[])",
+      "initialize(address,uint64,uint64,address,(address,uint256)[],(address,uint256)[],(address,uint64)[])",
       [
+        await recoveryManager.getAddress(),
         basePeriodDuration,
         vaultNameRetentionPeriod,
         SUBSCRIPTION_SIGNER.address,
@@ -115,6 +119,7 @@ describe("VaultSubscriptionManager", () => {
     it("should correctly set initial data", async () => {
       expect(await subscriptionManager.owner()).to.be.eq(OWNER);
       expect(await subscriptionManager.implementation()).to.be.eq(subscriptionManagerImpl);
+      expect(await subscriptionManager.getRecoveryManager()).to.be.eq(recoveryManager);
       expect(await subscriptionManager.getBasePeriodDuration()).to.be.eq(basePeriodDuration);
       expect(await subscriptionManager.getSubscriptionSigner()).to.be.eq(SUBSCRIPTION_SIGNER);
       expect(await subscriptionManager.getVaultNameRetentionPeriod()).to.be.eq(vaultNameRetentionPeriod);
@@ -145,6 +150,7 @@ describe("VaultSubscriptionManager", () => {
     it("should get exception if try to call init function twice", async () => {
       await expect(
         subscriptionManager.initialize(
+          OWNER.address,
           basePeriodDuration,
           vaultNameRetentionPeriod,
           SUBSCRIPTION_SIGNER.address,
@@ -263,7 +269,6 @@ describe("VaultSubscriptionManager", () => {
       expect(await subscriptionManager.isAvailableForPayment(ETHER_ADDR)).to.be.false;
 
       const newSubscriptionCost = nativeSubscriptionCost * 2n;
-      const newVaultNameCost = nativeVaultNameCost * 2n;
       const tx = await subscriptionManager.updatePaymentTokens([
         {
           paymentToken: ETHER_ADDR,
@@ -304,7 +309,6 @@ describe("VaultSubscriptionManager", () => {
   describe("#updateVaultPaymentTokens", () => {
     it("should correctly add new vault payment tokens", async () => {
       const newToken = await ethers.deployContract("ERC20Mock", ["Test ERC20 2", "TT2", 18]);
-      const subscriptionCost = wei(5);
       const vaultNameCost = wei(2);
 
       const tx = await subscriptionManager.updateVaultPaymentTokens([
@@ -485,6 +489,35 @@ describe("VaultSubscriptionManager", () => {
     it("should get exception if not an owner try to call this function", async () => {
       await expect(subscriptionManager.connect(FIRST).withdrawTokens(ETHER_ADDR, FIRST, wei(1)))
         .to.be.revertedWithCustomError(subscriptionManager, "OwnableUnauthorizedAccount")
+        .withArgs(FIRST.address);
+    });
+  });
+
+  describe("#activateSubscription", () => {
+    it("should activate subscription correctly", async () => {
+      const tx = await recoveryManager.activateSubscription(subscriptionManager, FIRST);
+
+      const timestamp = await time.latest();
+
+      await expect(tx).to.emit(subscriptionManager, "AccountActivated").withArgs(FIRST.address, timestamp);
+
+      expect(await subscriptionManager.getAccountSubscriptionEndTime(FIRST)).to.be.eq(timestamp);
+      expect(await subscriptionManager.hasSubscription(FIRST)).to.be.true;
+      expect(await subscriptionManager.hasActiveSubscription(FIRST)).to.be.false;
+      expect(await subscriptionManager.hasSubscriptionDebt(FIRST)).to.be.true;
+    });
+
+    it("should get exception if try to active already activated subscription", async () => {
+      await recoveryManager.activateSubscription(subscriptionManager, FIRST);
+
+      await expect(recoveryManager.activateSubscription(subscriptionManager, FIRST))
+        .to.be.revertedWithCustomError(subscriptionManager, "AccountAlreadyActivated")
+        .withArgs(FIRST.address);
+    });
+
+    it("should not allow to activate subscription if the caller is not the recovery manager", async () => {
+      await expect(subscriptionManager.connect(FIRST).activateSubscription(FIRST))
+        .to.be.revertedWithCustomError(subscriptionManager, "NotARecoveryManager")
         .withArgs(FIRST.address);
     });
   });

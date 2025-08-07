@@ -4,15 +4,15 @@ pragma solidity ^0.8.28;
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
+import {BaseSubscriptionModule} from "./BaseSubscriptionModule.sol";
+
 import {ISignatureSubscriptionModule} from "../../interfaces/subscription/modules/ISignatureSubscriptionModule.sol";
 
 import {EIP712SignatureChecker} from "../../libs/EIP712SignatureChecker.sol";
 
-import {BaseSubscriptionManager} from "../BaseSubscriptionManager.sol";
-
-contract SignatureSubscriptionModule is
+abstract contract SignatureSubscriptionModule is
     ISignatureSubscriptionModule,
-    BaseSubscriptionManager,
+    BaseSubscriptionModule,
     NoncesUpgradeable,
     EIP712Upgradeable
 {
@@ -46,18 +46,6 @@ contract SignatureSubscriptionModule is
         __EIP712_init("SignatureSubscriptionModule", "v1.0.0");
 
         _setSubscriptionSigner(subscriptionSigner_);
-    }
-
-    function setSubscriptionSigner(address newSubscriptionSigner_) external onlyOwner {
-        _setSubscriptionSigner(newSubscriptionSigner_);
-    }
-
-    function buySubscriptionWithSignature(
-        address account_,
-        uint64 duration_,
-        bytes memory signature_
-    ) external virtual {
-        _buySubscriptionWithSignature(account_, duration_, signature_);
     }
 
     function getSubscriptionSigner() external view returns (address) {

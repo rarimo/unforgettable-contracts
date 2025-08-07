@@ -227,7 +227,11 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
 
         _onlyExistingSubscriptionManager(subscribeData_.subscriptionManager);
 
-        for (uint256 i = 0; i < subscribeData_.recoveryMethods.length; i++) {
+        uint256 recoveryMethodsCount_ = subscribeData_.recoveryMethods.length;
+
+        require(recoveryMethodsCount_ > 0, NoRecoveryMethodsProvided());
+
+        for (uint256 i = 0; i < recoveryMethodsCount_; i++) {
             _validateRecoveryMethod(subscribeData_.recoveryMethods[i]);
         }
 
@@ -247,8 +251,6 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
                 subscribeData_.duration
             );
         }
-
-        uint256 recoveryMethodsCount_ = subscribeData_.recoveryMethods.length;
 
         uint256 firstRecoveryMethodId_ = recoveryData.nextRecoveryMethodId;
         for (uint256 i = 0; i < recoveryMethodsCount_; i++) {

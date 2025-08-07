@@ -43,6 +43,7 @@ interface IRecoveryManager is IRecoveryProvider {
     error RecoveryMethodNotSet(address account, uint256 recoveryMethodId);
     error AccountNotSubscribed(address account);
     error AccountAlreadySubscribed(address account);
+    error NoRecoveryMethodsProvided();
 
     event SubscriptionManagerAdded(address indexed subscriptionManager);
     event SubscriptionManagerRemoved(address indexed subscriptionManager);

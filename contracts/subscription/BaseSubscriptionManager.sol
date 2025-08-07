@@ -126,10 +126,7 @@ contract BaseSubscriptionManager is
     function activateSubscription(address account_) external onlyRecoveryManager {
         require(!hasSubscription(account_), AccountAlreadyActivated(account_));
 
-        AccountSubscriptionData storage accountData = _getAccountSubscriptionData(account_);
-
-        accountData.startTime = uint64(block.timestamp);
-        accountData.endTime = uint64(block.timestamp);
+        _extendSubscription(account_, 0);
 
         emit AccountActivated(account_, block.timestamp);
     }

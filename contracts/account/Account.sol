@@ -13,7 +13,7 @@ contract Account is ERC7821, BaseAccountRecovery {
         bytes calldata signature_
     ) public view virtual returns (bytes4 result_) {
         address recovered_ = ECDSA.recover(hash_, signature_);
-        bool success_ = recovered_ == address(this) || recovered_ == trustedExecutor;
+        bool success_ = recovered_ == address(this) || recovered_ == getTrustedExecutor();
         /// @solidity memory-safe-assembly
         assembly {
             result_ := shl(224, or(0x1626ba7e, sub(0, iszero(success_))))

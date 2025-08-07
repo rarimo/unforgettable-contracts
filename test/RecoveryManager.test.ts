@@ -426,6 +426,18 @@ describe("RecoveryManager", () => {
         "InvalidAccountRecoveryData",
       );
     });
+
+    it("should get exception if try to subscribe without recovery methods", async () => {
+      const subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
+        [[await subscriptionManager.getAddress(), ETHER_ADDR, basePeriodDuration, []]],
+      );
+
+      await expect(recoveryManager.connect(OWNER).subscribe(subscribeData)).to.be.revertedWithCustomError(
+        recoveryManager,
+        "NoRecoveryMethodsProvided",
+      );
+    });
   });
 
   describe("#unsubscribe", () => {

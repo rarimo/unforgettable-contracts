@@ -11,9 +11,9 @@ contract AccountMock is Account {
     function _getBaseAccountRecoveryMockStorage()
         private
         pure
-        returns (BaseAccountRecoveryStorage storage _ars)
+        returns (Base7702AccountRecoveryStorage storage _ars)
     {
-        bytes32 slot_ = BASE_ACCOUNT_RECOVERY_STORAGE_SLOT;
+        bytes32 slot_ = BASE_7702_ACCOUNT_RECOVERY_STORAGE_SLOT;
 
         assembly {
             _ars.slot := slot_

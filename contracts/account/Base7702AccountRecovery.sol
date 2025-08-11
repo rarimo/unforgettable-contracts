@@ -3,11 +3,11 @@ pragma solidity ^0.8.28;
 
 import {AAccountRecovery} from "@solarity/solidity-lib/account-abstraction/AAccountRecovery.sol";
 
-contract BaseAccountRecovery is AAccountRecovery {
-    bytes32 public constant BASE_ACCOUNT_RECOVERY_STORAGE_SLOT =
-        keccak256("unforgettable.contract.base.account.recovery.storage");
+contract Base7702AccountRecovery is AAccountRecovery {
+    bytes32 public constant BASE_7702_ACCOUNT_RECOVERY_STORAGE_SLOT =
+        keccak256("unforgettable.contract.base.7702.account.recovery.storage");
 
-    struct BaseAccountRecoveryStorage {
+    struct Base7702AccountRecoveryStorage {
         address trustedExecutor;
     }
 
@@ -16,9 +16,9 @@ contract BaseAccountRecovery is AAccountRecovery {
     function _getBaseAccountRecoveryStorage()
         private
         pure
-        returns (BaseAccountRecoveryStorage storage _ars)
+        returns (Base7702AccountRecoveryStorage storage _ars)
     {
-        bytes32 slot_ = BASE_ACCOUNT_RECOVERY_STORAGE_SLOT;
+        bytes32 slot_ = BASE_7702_ACCOUNT_RECOVERY_STORAGE_SLOT;
 
         assembly {
             _ars.slot := slot_
@@ -39,7 +39,7 @@ contract BaseAccountRecovery is AAccountRecovery {
     function addRecoveryProvider(
         address provider_,
         bytes memory recoveryData_
-    ) external override onlySelfOrTrustedExecutor {
+    ) external payable override onlySelfOrTrustedExecutor {
         _addRecoveryProvider(provider_, recoveryData_);
     }
 
@@ -48,26 +48,25 @@ contract BaseAccountRecovery is AAccountRecovery {
      */
     function removeRecoveryProvider(
         address provider_
-    ) external override onlySelfOrTrustedExecutor {
+    ) external payable override onlySelfOrTrustedExecutor {
         _removeRecoveryProvider(provider_);
     }
 
     /**
      * @inheritdoc AAccountRecovery
      */
-    function recoverOwnership(
-        address newTrustedExecutor_,
+    function recoverAccess(
+        bytes memory subject_,
         address provider_,
         bytes memory proof_
     ) external override returns (bool) {
-        _validateRecovery(newTrustedExecutor_, provider_, proof_);
+        _validateRecovery(subject_, provider_, proof_);
 
-        BaseAccountRecoveryStorage storage $ = _getBaseAccountRecoveryStorage();
+        address newTrustedExecutor_ = abi.decode(subject_, (address));
 
-        address oldTrustedExecutor_ = $.trustedExecutor;
-        $.trustedExecutor = newTrustedExecutor_;
+        _getBaseAccountRecoveryStorage().trustedExecutor = newTrustedExecutor_;
 
-        emit OwnershipRecovered(oldTrustedExecutor_, newTrustedExecutor_);
+        emit AccessRecovered(subject_);
 
         return true;
     }

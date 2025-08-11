@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
-import {IRecoveryProvider} from "./eip7947/IRecoveryProvider.sol";
+import {IRecoveryProvider} from "@solarity/solidity-lib/interfaces/account-abstraction/IRecoveryProvider.sol";
 
 interface IRecoveryManager is IRecoveryProvider {
     enum StrategyStatus {

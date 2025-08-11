@@ -32,6 +32,10 @@ describe("RecoveryManager", () => {
 
   let paymentToken: ERC20Mock;
 
+  function encodeAddress(address: string): string {
+    return ethers.AbiCoder.defaultAbiCoder().encode(["address"], [address]);
+  }
+
   before(async () => {
     [OWNER, FIRST, SECOND, MASTER_KEY1] = await ethers.getSigners();
 
@@ -549,7 +553,9 @@ describe("RecoveryManager", () => {
         [await subscriptionManager.getAddress(), 0, signature],
       );
 
-      await recoveryManager.connect(FIRST).recover(SECOND.address, recoveryProof);
+      const subject = encodeAddress(SECOND.address);
+
+      await recoveryManager.connect(FIRST).recover(subject, recoveryProof);
 
       signature = await getRecoverAccountSignature(recoveryStrategy, OWNER, {
         account: FIRST.address,
@@ -562,7 +568,7 @@ describe("RecoveryManager", () => {
         [await subscriptionManager.getAddress(), 0, signature],
       );
 
-      await expect(recoveryManager.connect(FIRST).recover(SECOND.address, recoveryProof)).to.be.revertedWithCustomError(
+      await expect(recoveryManager.connect(FIRST).recover(subject, recoveryProof)).to.be.revertedWithCustomError(
         recoveryStrategy,
         "InvalidSignature",
       );
@@ -600,7 +606,7 @@ describe("RecoveryManager", () => {
 
       await recoveryManager.connect(OWNER).disableStrategy(0);
 
-      await recoveryManager.connect(FIRST).recover(SECOND.address, recoveryProof);
+      await recoveryManager.connect(FIRST).recover(encodeAddress(SECOND.address), recoveryProof);
     });
 
     it("should get exception if try to recover without recovery method set", async () => {
@@ -635,7 +641,9 @@ describe("RecoveryManager", () => {
         [await subscriptionManager.getAddress(), 0n, signature],
       );
 
-      await expect(recoveryManager.connect(FIRST).recover(SECOND.address, recoveryProof))
+      const subject = encodeAddress(SECOND.address);
+
+      await expect(recoveryManager.connect(FIRST).recover(subject, recoveryProof))
         .to.be.revertedWithCustomError(recoveryManager, "RecoveryMethodNotSet")
         .withArgs(FIRST.address, 0n);
 
@@ -644,7 +652,7 @@ describe("RecoveryManager", () => {
         [await subscriptionManager.getAddress(), 1n, signature],
       );
 
-      await expect(recoveryManager.connect(FIRST).recover(SECOND.address, recoveryProof))
+      await expect(recoveryManager.connect(FIRST).recover(subject, recoveryProof))
         .to.be.revertedWithCustomError(recoveryManager, "RecoveryMethodNotSet")
         .withArgs(FIRST.address, 1n);
     });
@@ -681,7 +689,7 @@ describe("RecoveryManager", () => {
         [await subscriptionManager.getAddress(), 0, signature],
       );
 
-      await expect(recoveryManager.connect(SECOND).recover(OWNER.address, recoveryProof))
+      await expect(recoveryManager.connect(SECOND).recover(encodeAddress(OWNER.address), recoveryProof))
         .to.be.revertedWithCustomError(recoveryManager, "NoActiveSubscription")
         .withArgs(await subscriptionManager.getAddress(), SECOND.address);
     });

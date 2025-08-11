@@ -5,9 +5,9 @@ import {ERC7821} from "solady/src/accounts/ERC7821.sol";
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-import {BaseAccountRecovery} from "./BaseAccountRecovery.sol";
+import {Base7702AccountRecovery} from "./Base7702AccountRecovery.sol";
 
-contract Account is ERC7821, BaseAccountRecovery {
+contract Account is ERC7821, Base7702AccountRecovery {
     function isValidSignature(
         bytes32 hash_,
         bytes calldata signature_

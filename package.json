@@ -37,7 +37,7 @@
   "dependencies": {
     "@openzeppelin/contracts": "5.3.0",
     "@openzeppelin/contracts-upgradeable": "5.3.0",
-    "@solarity/solidity-lib": "3.1.4",
+    "@solarity/solidity-lib": "3.1.7",
     "solady": "^0.1.24"
   },
   "devDependencies": {

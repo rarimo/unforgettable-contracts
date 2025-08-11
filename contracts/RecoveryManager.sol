@@ -71,7 +71,7 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
         _subscribe(recoveryData_);
     }
 
-    function unsubscribe() external {
+    function unsubscribe() external payable {
         _unsubscribe();
     }
 
@@ -81,7 +81,7 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
         _subscribe(recoveryData_);
     }
 
-    function recover(address newOwner_, bytes memory proof_) external {
+    function recover(bytes memory object_, bytes memory proof_) external {
         RecoveryManagerStorage storage $ = _getRecoveryManagerStorage();
 
         (
@@ -105,7 +105,7 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
 
         IRecoveryStrategy(getStrategy(recoveryMethod_.strategyId)).recoverAccount(
             msg.sender,
-            newOwner_,
+            abi.decode(object_, (address)),
             abi.encode(recoveryMethod_.recoveryData, recoveryProof_)
         );
     }

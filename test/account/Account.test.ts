@@ -164,9 +164,11 @@ describe("Account", () => {
         [await subscriptionManager.getAddress(), 0, signature],
       );
 
-      let tx = await account.connect(OWNER).recoverOwnership(SECOND, recoveryManager, recoveryProof);
+      const subject = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [SECOND.address]);
 
-      await expect(tx).to.emit(account, "OwnershipRecovered").withArgs(MASTER_KEY1.address, SECOND.address);
+      let tx = await account.connect(OWNER).recoverAccess(subject, recoveryManager, recoveryProof);
+
+      await expect(tx).to.emit(account, "AccessRecovered").withArgs(subject);
 
       expect(await account.getTrustedExecutor()).to.be.eq(SECOND);
 
@@ -182,7 +184,7 @@ describe("Account", () => {
       );
 
       await expect(
-        account.connect(FIRST).recoverOwnership(SECOND, recoveryManager, recoveryProof),
+        account.connect(FIRST).recoverAccess(subject, recoveryManager, recoveryProof),
       ).to.be.revertedWithCustomError(recoveryStrategy, "InvalidSignature");
 
       await paymentToken.connect(FIRST).transfer(account, wei(10));

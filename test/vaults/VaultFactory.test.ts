@@ -49,8 +49,9 @@ describe("VaultFactory", () => {
 
     const subscriptionManagerImpl = await ethers.deployContract("VaultSubscriptionManager");
     const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
-      "initialize(uint64,uint64,address,(address,uint256, uint256)[],(address,uint64)[])",
+      "initialize(address,uint64,uint64,address,(address,uint256)[],(address,uint256)[],(address,uint64)[])",
       [
+        OWNER.address,
         basePeriodDuration,
         3600n * 24n,
         SUBSCRIPTION_SIGNER.address,
@@ -58,11 +59,19 @@ describe("VaultFactory", () => {
           {
             paymentToken: ETHER_ADDR,
             baseSubscriptionCost: nativeSubscriptionCost,
-            baseVaultNameCost: nativeSubscriptionCost,
           },
           {
             paymentToken: await paymentToken.getAddress(),
             baseSubscriptionCost: paymentTokenSubscriptionCost,
+          },
+        ],
+        [
+          {
+            paymentToken: ETHER_ADDR,
+            baseVaultNameCost: nativeSubscriptionCost,
+          },
+          {
+            paymentToken: await paymentToken.getAddress(),
             baseVaultNameCost: paymentTokenSubscriptionCost,
           },
         ],

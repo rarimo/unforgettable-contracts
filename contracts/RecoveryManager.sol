@@ -2,45 +2,22 @@
 pragma solidity ^0.8.28;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import {IRecoveryManager} from "./interfaces/IRecoveryManager.sol";
-import {ISubscriptionManager} from "./interfaces/ISubscriptionManager.sol";
+import {ISubscriptionManager} from "./interfaces/subscription/ISubscriptionManager.sol";
 import {IRecoveryStrategy} from "./interfaces/strategies/IRecoveryStrategy.sol";
 
+import {TokensHelper} from "./libs/TokensHelper.sol";
+
 contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
-    using EnumerableSet for EnumerableSet.AddressSet;
-    using SafeERC20 for IERC20;
+    using EnumerableSet for *;
+    using TokensHelper for address;
 
     bytes32 public constant RECOVERY_MANAGER_STORAGE_SLOT =
         keccak256("unforgettable.contract.recovery.manager.storage");
-
-    struct SubscribeData {
-        address subscriptionManager;
-        address paymentTokenAddr;
-        uint64 duration;
-        RecoveryMethod[] recoveryMethods;
-    }
-
-    struct RecoveryMethod {
-        uint256 strategyId;
-        bytes recoveryData;
-    }
-
-    struct AccountRecoveryMethods {
-        uint256 nextRecoveryMethodId;
-        EnumerableSet.UintSet activeRecoveryMethods;
-        mapping(uint256 => RecoveryMethod) recoveryMethods;
-    }
-
-    struct AccountRecoveryData {
-        EnumerableSet.AddressSet subscriptionManagers;
-        mapping(address => AccountRecoveryMethods) accountsRecoveryMethods;
-    }
 
     struct RecoveryManagerStorage {
         uint256 nextStrategyId;
@@ -48,10 +25,6 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
         mapping(uint256 => StrategyData) strategiesData;
         mapping(address => AccountRecoveryData) accountsRecoveryData;
     }
-
-    error InvalidRecoveryStrategy(address recoveryStrategy);
-    error SubscriptionManagerDoesNotExist(address subscriptionManager);
-    error NoActiveSubscription(address subscriptionManager, address account);
 
     function _getRecoveryManagerStorage()
         private
@@ -94,40 +67,69 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
         _enableStrategy(strategyId_);
     }
 
-    function subscribe(bytes memory recoveryData_) external {
-        // Make payable?
+    function subscribe(bytes memory recoveryData_) external payable {
+        _subscribe(recoveryData_);
+    }
+
+    function unsubscribe() external payable {
+        _unsubscribe();
+    }
+
+    function resubscribe(bytes memory recoveryData_) external payable {
+        _unsubscribe();
+
+        _subscribe(recoveryData_);
+    }
+
+    function recover(bytes memory object_, bytes memory proof_) external {
         RecoveryManagerStorage storage $ = _getRecoveryManagerStorage();
 
-        SubscribeData memory subscribeData_ = abi.decode(recoveryData_, (SubscribeData));
+        (
+            address subscriptionManager_,
+            uint256 recoveryMethodId_,
+            bytes memory recoveryProof_
+        ) = abi.decode(proof_, (address, uint256, bytes));
 
-        _onlyExistingSubscriptionManager(subscribeData_.subscriptionManager);
+        _onlyExistingSubscriptionManager(subscriptionManager_);
 
-        for (uint256 i = 0; i < subscribeData_.recoveryMethods.length; i++) {
-            _validateRecoveryMethod(subscribeData_.recoveryMethods[i]);
-        }
+        _checkActiveSubscription(subscriptionManager_, msg.sender);
 
-        if (subscribeData_.paymentTokenAddr != address(0)) {
-            _buySubscriptionFor(
-                msg.sender,
-                ISubscriptionManager(subscribeData_.subscriptionManager),
-                IERC20(subscribeData_.paymentTokenAddr),
-                subscribeData_.duration
-            );
-        }
+        AccountRecoveryData storage recoveryData = $.accountsRecoveryData[msg.sender];
 
         require(
-            ISubscriptionManager(subscribeData_.subscriptionManager).hasActiveSubscription(
-                msg.sender
-            ),
-            NoActiveSubscription(subscribeData_.subscriptionManager, msg.sender)
+            recoveryData.activeRecoveryMethods.contains(recoveryMethodId_),
+            RecoveryMethodNotSet(msg.sender, recoveryMethodId_)
+        );
+
+        RecoveryMethod memory recoveryMethod_ = recoveryData.recoveryMethods[recoveryMethodId_];
+
+        IRecoveryStrategy(getStrategy(recoveryMethod_.strategyId)).recoverAccount(
+            msg.sender,
+            abi.decode(object_, (address)),
+            abi.encode(recoveryMethod_.recoveryData, recoveryProof_)
         );
     }
 
-    function unsubscribe() external {}
+    function getRecoveryData(address account_) external view returns (bytes memory) {
+        return abi.encode(getRecoveryMethods(account_));
+    }
 
-    function recover(address newOwner_, bytes memory proof_) external {}
+    function getRecoveryMethods(
+        address account_
+    ) public view returns (RecoveryMethod[] memory recoveryMethods_) {
+        AccountRecoveryData storage recoveryData = _getRecoveryManagerStorage()
+            .accountsRecoveryData[account_];
 
-    function getRecoveryData(address account_) external view returns (bytes memory) {}
+        uint256[] memory recoveryMethodIds_ = recoveryData.activeRecoveryMethods.values();
+
+        uint256 recoveryMethodsCount_ = recoveryMethodIds_.length;
+
+        recoveryMethods_ = new RecoveryMethod[](recoveryMethodsCount_);
+
+        for (uint256 i = 0; i < recoveryMethodsCount_; i++) {
+            recoveryMethods_[i] = recoveryData.recoveryMethods[recoveryMethodIds_[i]];
+        }
+    }
 
     function subscriptionManagerExists(address subscriptionManager_) public view returns (bool) {
         return _getRecoveryManagerStorage().subscriptionManagers.contains(subscriptionManager_);
@@ -215,22 +217,109 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
         emit StrategyEnabled(strategyId_);
     }
 
+    function _subscribe(bytes memory recoveryData_) internal {
+        AccountRecoveryData storage recoveryData = _getRecoveryManagerStorage()
+            .accountsRecoveryData[msg.sender];
+
+        require(recoveryData.nextRecoveryMethodId == 0, AccountAlreadySubscribed(msg.sender));
+
+        SubscribeData memory subscribeData_ = abi.decode(recoveryData_, (SubscribeData));
+
+        _onlyExistingSubscriptionManager(subscribeData_.subscriptionManager);
+
+        uint256 recoveryMethodsCount_ = subscribeData_.recoveryMethods.length;
+
+        require(recoveryMethodsCount_ > 0, NoRecoveryMethodsProvided());
+
+        for (uint256 i = 0; i < recoveryMethodsCount_; i++) {
+            _validateRecoveryMethod(subscribeData_.recoveryMethods[i]);
+        }
+
+        ISubscriptionManager subscriptionManager_ = ISubscriptionManager(
+            subscribeData_.subscriptionManager
+        );
+
+        if (!subscriptionManager_.hasSubscription(msg.sender)) {
+            subscriptionManager_.activateSubscription(msg.sender);
+        }
+
+        if (subscribeData_.paymentTokenAddr != address(0)) {
+            _buySubscriptionFor(
+                msg.sender,
+                subscriptionManager_,
+                subscribeData_.paymentTokenAddr,
+                subscribeData_.duration
+            );
+        }
+
+        uint256 firstRecoveryMethodId_ = recoveryData.nextRecoveryMethodId;
+        for (uint256 i = 0; i < recoveryMethodsCount_; i++) {
+            uint256 newRecoveryMethodId_ = firstRecoveryMethodId_ + i;
+
+            recoveryData.activeRecoveryMethods.add(newRecoveryMethodId_);
+
+            recoveryData.recoveryMethods[newRecoveryMethodId_] = subscribeData_.recoveryMethods[i];
+        }
+
+        recoveryData.nextRecoveryMethodId = firstRecoveryMethodId_ + recoveryMethodsCount_;
+
+        emit AccountSubscribed(msg.sender);
+    }
+
+    function _unsubscribe() internal {
+        RecoveryManagerStorage storage $ = _getRecoveryManagerStorage();
+
+        AccountRecoveryData storage recoveryData = $.accountsRecoveryData[msg.sender];
+
+        require(recoveryData.nextRecoveryMethodId != 0, AccountNotSubscribed(msg.sender));
+
+        recoveryData.activeRecoveryMethods.clear();
+
+        delete $.accountsRecoveryData[msg.sender];
+
+        emit AccountUnsubscribed(msg.sender);
+    }
+
     function _buySubscriptionFor(
         address account_,
         ISubscriptionManager subscriptionManager_,
-        IERC20 paymentToken_,
+        address paymentToken_,
         uint64 duration_
     ) internal {
         uint256 subscriptionCostInTokens_ = subscriptionManager_.getSubscriptionCost(
             account_,
-            address(paymentToken_),
+            paymentToken_,
             duration_
         );
 
-        paymentToken_.safeTransferFrom(account_, address(this), subscriptionCostInTokens_);
-        paymentToken_.approve(address(subscriptionManager_), subscriptionCostInTokens_);
+        paymentToken_.receiveTokens(msg.sender, subscriptionCostInTokens_);
 
-        subscriptionManager_.buySubscription(account_, address(paymentToken_), duration_);
+        uint256 valueAmount_;
+
+        if (paymentToken_.isNativeToken()) {
+            valueAmount_ = subscriptionCostInTokens_;
+        } else {
+            IERC20(paymentToken_).approve(
+                address(subscriptionManager_),
+                subscriptionCostInTokens_
+            );
+        }
+
+        subscriptionManager_.buySubscription{value: valueAmount_}(
+            account_,
+            address(paymentToken_),
+            duration_
+        );
+    }
+
+    function _checkActiveSubscription(
+        address subscriptionManager_,
+        address account_
+    ) internal view {
+        require(
+            ISubscriptionManager(subscriptionManager_).hasActiveSubscription(account_),
+            NoActiveSubscription(subscriptionManager_, account_)
+        );
     }
 
     function _validateRecoveryMethod(RecoveryMethod memory recoveryMethod_) internal view {

@@ -41,7 +41,13 @@ describe("RecoveryManager", () => {
 
     paymentToken = await ethers.deployContract("ERC20Mock", ["Test Token", "TT", 18]);
 
-    recoveryManager = await ethers.deployContract("RecoveryManager");
+    const recoveryManagerImpl = await ethers.deployContract("RecoveryManager");
+    const recoveryManagerProxy = await ethers.deployContract("ERC1967Proxy", [
+      await recoveryManagerImpl.getAddress(),
+      "0x",
+    ]);
+
+    recoveryManager = await ethers.getContractAt("RecoveryManager", await recoveryManagerProxy.getAddress());
 
     subscriptionManagerImpl = await ethers.deployContract("AccountSubscriptionManager");
     const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(

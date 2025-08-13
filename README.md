@@ -1,10 +1,6 @@
-# Hardhat template 
+# Unforgettable Contracts
 
-Template hardhat repository for ad-hoc smart contracts development.
-
-### How to use
-
-The template works out of the box. To clean up the repo, you may need to delete the mock contracts, tests and migration files.
+### Dev Info
 
 #### Compilation
 
@@ -44,23 +40,3 @@ The command to generate the bindings is as follows:
 ```bash
 npm run generate-types
 ```
-
-> See the full list of available commands in the `package.json` file.
-
-### Integrated plugins
-
-- Hardhat official `ethers` + `ethers-v6`
-- [`Typechain`](https://www.npmjs.com/package/@typechain/hardhat)
-- [`hardhat-migrate`](https://www.npmjs.com/package/@solarity/hardhat-migrate), [`hardhat-markup`](https://www.npmjs.com/package/@solarity/hardhat-markup), [`hardhat-gobind`](https://www.npmjs.com/package/@solarity/hardhat-gobind)
-- [`hardhat-zkit`](https://www.npmjs.com/package/@solarity/hardhat-zkit), [`chai-zkit`](https://www.npmjs.com/package/@solarity/chai-zkit)
-- [`hardhat-contract-sizer`](https://www.npmjs.com/package/hardhat-contract-sizer)
-- [`hardhat-gas-reporter`](https://www.npmjs.com/package/hardhat-gas-reporter)
-- [`solidity-coverage`](https://www.npmjs.com/package/solidity-coverage)
-
-### Other niceties
-
-- The template comes with presetup `prettier`, `solhint` and `eslint` that lint the project via `husky` before compilation hook.
-- The `.env.example` file is provided to check what is required as ENVs
-- Preinstalled `@openzeppelin/contracts` and `@solarity/solidity-lib`
-
-> Install the `ESLint` extension in VSCode to enable `ESLint`.

@@ -61,12 +61,15 @@ abstract contract VaultNameSubscriptionModule is
     }
 
     function __VaultNameSubscriptionModule_init(
+        address vaultFactoryAddr_,
         uint64 vaultNameRetentionPeriod_,
         VaultPaymentTokenUpdateEntry[] calldata vaultPaymentTokenEntries_
     ) public onlyInitializing {
         __EIP712_init("VaultNameSubscriptionModule", "v1.0.0");
 
         _setVaultNameRetentionPeriod(vaultNameRetentionPeriod_);
+
+        _getVaultNameSubscriptionModuleStorage().vaultFactory = IVaultFactory(vaultFactoryAddr_);
 
         _updateVaultPaymentTokens(vaultPaymentTokenEntries_);
     }
@@ -134,10 +137,6 @@ abstract contract VaultNameSubscriptionModule is
             block.timestamp;
 
         return hasSubscriptionDebt(previousVault_) && retentionPeriodPassed_;
-    }
-
-    function _secondStepInitialize(address vaultFactoryAddr_) internal {
-        _getVaultNameSubscriptionModuleStorage().vaultFactory = IVaultFactory(vaultFactoryAddr_);
     }
 
     function _setVaultNameRetentionPeriod(uint64 newVaultNameRetentionPeriod_) internal {

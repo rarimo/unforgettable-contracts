@@ -6,13 +6,15 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
+import {ADeployerGuard} from "@solarity/solidity-lib/utils/ADeployerGuard.sol";
+
 import {IRecoveryManager} from "./interfaces/IRecoveryManager.sol";
 import {ISubscriptionManager} from "./interfaces/subscription/ISubscriptionManager.sol";
 import {IRecoveryStrategy} from "./interfaces/strategies/IRecoveryStrategy.sol";
 
 import {TokensHelper} from "./libs/TokensHelper.sol";
 
-contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
+contract RecoveryManager is IRecoveryManager, ADeployerGuard, OwnableUpgradeable {
     using EnumerableSet for *;
     using TokensHelper for address;
 
@@ -24,6 +26,10 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
         EnumerableSet.AddressSet subscriptionManagers;
         mapping(uint256 => StrategyData) strategiesData;
         mapping(address => AccountRecoveryData) accountsRecoveryData;
+    }
+
+    constructor() ADeployerGuard(msg.sender) {
+        _disableInitializers();
     }
 
     function _getRecoveryManagerStorage()
@@ -41,7 +47,7 @@ contract RecoveryManager is IRecoveryManager, OwnableUpgradeable {
     function initialize(
         address[] calldata subscriptionManagers_,
         address[] calldata recoveryStrategies_
-    ) external initializer {
+    ) external initializer onlyDeployer {
         __Ownable_init(msg.sender);
 
         _updateSubscriptionManagers(subscriptionManagers_, true);

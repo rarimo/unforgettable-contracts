@@ -13,6 +13,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import {Paginator} from "@solarity/solidity-lib/libs/arrays/Paginator.sol";
+import {ADeployerGuard} from "@solarity/solidity-lib/utils/ADeployerGuard.sol";
 
 import {IVault} from "../interfaces/vaults/IVault.sol";
 import {IVaultFactory} from "../interfaces/vaults/IVaultFactory.sol";
@@ -26,6 +27,7 @@ import {TokensHelper} from "../libs/TokensHelper.sol";
  */
 contract VaultFactory is
     IVaultFactory,
+    ADeployerGuard,
     OwnableUpgradeable,
     UUPSUpgradeable,
     NoncesUpgradeable,
@@ -46,7 +48,7 @@ contract VaultFactory is
         mapping(address => EnumerableSet.AddressSet) vaultsByCreator;
     }
 
-    constructor() {
+    constructor() ADeployerGuard(msg.sender) {
         _disableInitializers();
     }
 
@@ -58,17 +60,16 @@ contract VaultFactory is
         }
     }
 
-    function initialize(address vaultImplementation_) external initializer {
+    function initialize(
+        address vaultImplementation_,
+        address vaultSubscriptionManager_
+    ) external initializer onlyDeployer {
         __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
 
-        _updateVaultImplementation(vaultImplementation_);
-    }
-
-    function secondStepInitialize(
-        address vaultSubscriptionManager_
-    ) external onlyOwner reinitializer(2) {
         _getVaultFactoryStorage().vaultSubscriptionManager = vaultSubscriptionManager_;
+
+        _updateVaultImplementation(vaultImplementation_);
     }
 
     function updateVaultImplementation(address newVaultImpl_) external onlyOwner {

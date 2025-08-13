@@ -56,52 +56,49 @@ describe("VaultSubscriptionManager", () => {
     recoveryManager = await ethers.deployContract("RecoveryManagerMock");
 
     subscriptionManagerImpl = await ethers.deployContract("VaultSubscriptionManager");
-    const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
-      "initialize(address,uint64,uint64,address,(address,uint256)[],(address,uint256)[],(address,uint64)[])",
-      [
-        await recoveryManager.getAddress(),
-        basePeriodDuration,
-        vaultNameRetentionPeriod,
-        SUBSCRIPTION_SIGNER.address,
-        [
-          {
-            paymentToken: ETHER_ADDR,
-            baseSubscriptionCost: nativeSubscriptionCost,
-          },
-          {
-            paymentToken: await paymentToken.getAddress(),
-            baseSubscriptionCost: paymentTokenSubscriptionCost,
-          },
-        ],
-        [
-          {
-            paymentToken: ETHER_ADDR,
-            baseVaultNameCost: nativeVaultNameCost,
-          },
-          {
-            paymentToken: await paymentToken.getAddress(),
-            baseVaultNameCost: paymentTokenVaultNameCost,
-          },
-        ],
-        [
-          {
-            sbtToken: await sbtToken.getAddress(),
-            subscriptionTimePerToken: sbtSubscriptionTime,
-          },
-        ],
-      ],
-    );
 
     const subscriptionManagerProxy = await ethers.deployContract("ERC1967Proxy", [
       await subscriptionManagerImpl.getAddress(),
-      subscriptionManagerInitData,
+      "0x",
     ]);
     subscriptionManager = await ethers.getContractAt(
       "VaultSubscriptionManager",
       await subscriptionManagerProxy.getAddress(),
     );
 
-    await subscriptionManager.secondStepInitialize(await vaultFactory.getAddress());
+    await subscriptionManager.initialize({
+      recoveryManager: await recoveryManager.getAddress(),
+      vaultFactoryAddr: await vaultFactory.getAddress(),
+      subscriptionSigner: SUBSCRIPTION_SIGNER.address,
+      basePeriodDuration,
+      vaultNameRetentionPeriod,
+      basePaymentTokenEntries: [
+        {
+          paymentToken: ETHER_ADDR,
+          baseSubscriptionCost: nativeSubscriptionCost,
+        },
+        {
+          paymentToken: await paymentToken.getAddress(),
+          baseSubscriptionCost: paymentTokenSubscriptionCost,
+        },
+      ],
+      vaultPaymentTokenEntries: [
+        {
+          paymentToken: ETHER_ADDR,
+          baseVaultNameCost: nativeVaultNameCost,
+        },
+        {
+          paymentToken: await paymentToken.getAddress(),
+          baseVaultNameCost: paymentTokenVaultNameCost,
+        },
+      ],
+      sbtTokenEntries: [
+        {
+          sbtToken: await sbtToken.getAddress(),
+          subscriptionTimePerToken: sbtSubscriptionTime,
+        },
+      ],
+    });
 
     await paymentToken.mint(FIRST, initialTokensAmount);
     await paymentToken.mint(SECOND, initialTokensAmount);
@@ -149,29 +146,17 @@ describe("VaultSubscriptionManager", () => {
 
     it("should get exception if try to call init function twice", async () => {
       await expect(
-        subscriptionManager.initialize(
-          OWNER.address,
+        subscriptionManager.initialize({
+          recoveryManager: await recoveryManager.getAddress(),
+          vaultFactoryAddr: await vaultFactory.getAddress(),
+          subscriptionSigner: SUBSCRIPTION_SIGNER.address,
           basePeriodDuration,
           vaultNameRetentionPeriod,
-          SUBSCRIPTION_SIGNER.address,
-          [],
-          [],
-          [],
-        ),
+          basePaymentTokenEntries: [],
+          vaultPaymentTokenEntries: [],
+          sbtTokenEntries: [],
+        }),
       ).to.be.revertedWithCustomError(subscriptionManager, "InvalidInitialization");
-    });
-
-    it("should get exception if not an owner try to call secondStepInitialize function", async () => {
-      await expect(subscriptionManager.connect(FIRST).secondStepInitialize(FIRST))
-        .to.be.revertedWithCustomError(subscriptionManager, "OwnableUnauthorizedAccount")
-        .withArgs(FIRST.address);
-    });
-
-    it("should get exception if try to call secondStepInitialize function twice", async () => {
-      await expect(subscriptionManager.secondStepInitialize(FIRST)).to.be.revertedWithCustomError(
-        subscriptionManager,
-        "InvalidInitialization",
-      );
     });
   });
 
@@ -244,7 +229,6 @@ describe("VaultSubscriptionManager", () => {
     it("should correctly add new payment tokens", async () => {
       const newToken = await ethers.deployContract("ERC20Mock", ["Test ERC20 2", "TT2", 18]);
       const subscriptionCost = wei(5);
-      const vaultNameCost = wei(2);
 
       const tx = await subscriptionManager.updatePaymentTokens([
         {
@@ -553,7 +537,6 @@ describe("VaultSubscriptionManager", () => {
         {
           paymentToken: await paymentToken.getAddress(),
           baseSubscriptionCost: paymentTokenSubscriptionCost * 2n,
-          baseVaultNameCost: paymentTokenVaultNameCost * 2n,
         },
       ]);
 
@@ -1092,7 +1075,6 @@ describe("VaultSubscriptionManager", () => {
         {
           paymentToken: await paymentToken.getAddress(),
           baseSubscriptionCost: newPaymentTokenSubscriptionCost,
-          baseVaultNameCost: paymentTokenVaultNameCost,
         },
       ]);
 
@@ -1124,7 +1106,6 @@ describe("VaultSubscriptionManager", () => {
         {
           paymentToken: await paymentToken.getAddress(),
           baseSubscriptionCost: newPaymentTokenSubscriptionCost,
-          baseVaultNameCost: paymentTokenVaultNameCost,
         },
       ]);
 

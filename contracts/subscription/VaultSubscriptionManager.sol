@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {ADeployerGuard} from "@solarity/solidity-lib/utils/ADeployerGuard.sol";
+
+import {IVaultSubscriptionManager} from "../interfaces/subscription/IVaultSubscriptionManager.sol";
+
 import {BaseSubscriptionManager} from "./BaseSubscriptionManager.sol";
 
 import {VaultNameSubscriptionModule} from "./modules/VaultNameSubscriptionModule.sol";
@@ -8,35 +12,43 @@ import {SignatureSubscriptionModule} from "./modules/SignatureSubscriptionModule
 import {SBTSubscriptionModule} from "./modules/SBTSubscriptionModule.sol";
 
 contract VaultSubscriptionManager is
+    ADeployerGuard,
     BaseSubscriptionManager,
     VaultNameSubscriptionModule,
     SignatureSubscriptionModule,
     SBTSubscriptionModule
 {
-    function initialize(
-        address recoveryManager_,
-        uint64 basePeriodDuration_,
-        uint64 vaultNameRetentionPeriod_,
-        address subscriptionSigner_,
-        PaymentTokenUpdateEntry[] calldata basePaymentTokenEntries_,
-        VaultPaymentTokenUpdateEntry[] calldata vaultPaymentTokenEntries_,
-        SBTTokenUpdateEntry[] calldata sbtTokenEntries_
-    ) external initializer {
-        __BaseSubscriptionManager_init(
-            recoveryManager_,
-            basePeriodDuration_,
-            basePaymentTokenEntries_
-        );
-
-        __VaultNameSubscriptionModule_init(vaultNameRetentionPeriod_, vaultPaymentTokenEntries_);
-
-        __SignatureSubscriptionModule_init(subscriptionSigner_);
-
-        __SBTSubscriptionModule_init(sbtTokenEntries_);
+    struct VaultSubscriptionManagerInitData {
+        address recoveryManager;
+        address vaultFactoryAddr;
+        address subscriptionSigner;
+        uint64 basePeriodDuration;
+        uint64 vaultNameRetentionPeriod;
+        PaymentTokenUpdateEntry[] basePaymentTokenEntries;
+        VaultPaymentTokenUpdateEntry[] vaultPaymentTokenEntries;
+        SBTTokenUpdateEntry[] sbtTokenEntries;
     }
 
-    function secondStepInitialize(address vaultFactoryAddr_) external onlyOwner reinitializer(2) {
-        _secondStepInitialize(vaultFactoryAddr_);
+    constructor() ADeployerGuard(msg.sender) {
+        _disableInitializers();
+    }
+
+    function initialize(
+        VaultSubscriptionManagerInitData calldata initData
+    ) external initializer onlyDeployer {
+        __BaseSubscriptionManager_init(
+            initData.recoveryManager,
+            initData.basePeriodDuration,
+            initData.basePaymentTokenEntries
+        );
+
+        __VaultNameSubscriptionModule_init(
+            initData.vaultFactoryAddr,
+            initData.vaultNameRetentionPeriod,
+            initData.vaultPaymentTokenEntries
+        );
+        __SignatureSubscriptionModule_init(initData.subscriptionSigner);
+        __SBTSubscriptionModule_init(initData.sbtTokenEntries);
     }
 
     function updateSBTTokens(SBTTokenUpdateEntry[] calldata sbtTokenEntries_) external onlyOwner {

@@ -23,7 +23,6 @@ interface IVaultNameSubscriptionModule {
         address indexed newVault
     );
 
-    function secondStepInitialize(address vaultFactoryAddr_) external;
     function setVaultNameRetentionPeriod(uint64 newVaultNameRetentionPeriod_) external;
     function updateVaultPaymentTokens(
         VaultPaymentTokenUpdateEntry[] calldata vaultPaymentTokenEntries_

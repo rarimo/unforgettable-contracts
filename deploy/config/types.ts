@@ -11,6 +11,7 @@ export type VaultsConfig = {
   basePeriodDuration: bigint;
   vaultNameRetentionPeriod: bigint;
   subscriptionSigner: string;
+  reservedTokensAmountPerAddress: bigint;
   paymentTokenConfigs: ISubscriptionManager.PaymentTokenUpdateEntryStruct[];
   vaultPaymentTokenConfigs: IVaultNameSubscriptionModule.VaultPaymentTokenUpdateEntryStruct[];
   sbtTokenConfigs: ISBTSubscriptionModule.SBTTokenUpdateEntryStruct[];

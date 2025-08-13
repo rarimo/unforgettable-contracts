@@ -37,59 +37,49 @@ describe("VaultFactory", () => {
     vaultImpl = await ethers.deployContract("Vault");
     vaultFactoryImpl = await ethers.deployContract("VaultFactory");
 
-    const vaultFactoryInitData = vaultFactoryImpl.interface.encodeFunctionData("initialize(address)", [
-      await vaultImpl.getAddress(),
-    ]);
-    const vaultFactoryProxy = await ethers.deployContract("ERC1967Proxy", [
-      await vaultFactoryImpl.getAddress(),
-      vaultFactoryInitData,
+    const vaultFactoryProxy = await ethers.deployContract("ERC1967Proxy", [await vaultFactoryImpl.getAddress(), "0x"]);
+
+    const subscriptionManagerImpl = await ethers.deployContract("VaultSubscriptionManager");
+    const subscriptionManagerProxy = await ethers.deployContract("ERC1967Proxy", [
+      await subscriptionManagerImpl.getAddress(),
+      "0x",
     ]);
 
     vaultFactory = await ethers.getContractAt("VaultFactory", await vaultFactoryProxy.getAddress());
-
-    const subscriptionManagerImpl = await ethers.deployContract("VaultSubscriptionManager");
-    const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
-      "initialize(address,uint64,uint64,address,(address,uint256)[],(address,uint256)[],(address,uint64)[])",
-      [
-        OWNER.address,
-        basePeriodDuration,
-        3600n * 24n,
-        SUBSCRIPTION_SIGNER.address,
-        [
-          {
-            paymentToken: ETHER_ADDR,
-            baseSubscriptionCost: nativeSubscriptionCost,
-          },
-          {
-            paymentToken: await paymentToken.getAddress(),
-            baseSubscriptionCost: paymentTokenSubscriptionCost,
-          },
-        ],
-        [
-          {
-            paymentToken: ETHER_ADDR,
-            baseVaultNameCost: nativeSubscriptionCost,
-          },
-          {
-            paymentToken: await paymentToken.getAddress(),
-            baseVaultNameCost: paymentTokenSubscriptionCost,
-          },
-        ],
-        [],
-      ],
-    );
-
-    const subscriptionManagerProxy = await ethers.deployContract("ERC1967Proxy", [
-      await subscriptionManagerImpl.getAddress(),
-      subscriptionManagerInitData,
-    ]);
     subscriptionManager = await ethers.getContractAt(
       "VaultSubscriptionManager",
       await subscriptionManagerProxy.getAddress(),
     );
 
-    await vaultFactory.secondStepInitialize(await subscriptionManagerProxy.getAddress());
-    await subscriptionManager.secondStepInitialize(await vaultFactoryProxy.getAddress());
+    await vaultFactory.initialize(vaultImpl, subscriptionManager);
+    await subscriptionManager.initialize({
+      recoveryManager: OWNER,
+      vaultFactoryAddr: await vaultFactory.getAddress(),
+      subscriptionSigner: SUBSCRIPTION_SIGNER.address,
+      basePeriodDuration,
+      vaultNameRetentionPeriod: 3600n * 24n,
+      basePaymentTokenEntries: [
+        {
+          paymentToken: ETHER_ADDR,
+          baseSubscriptionCost: nativeSubscriptionCost,
+        },
+        {
+          paymentToken: await paymentToken.getAddress(),
+          baseSubscriptionCost: paymentTokenSubscriptionCost,
+        },
+      ],
+      vaultPaymentTokenEntries: [
+        {
+          paymentToken: ETHER_ADDR,
+          baseVaultNameCost: nativeSubscriptionCost,
+        },
+        {
+          paymentToken: await paymentToken.getAddress(),
+          baseVaultNameCost: paymentTokenSubscriptionCost,
+        },
+      ],
+      sbtTokenEntries: [],
+    });
 
     await paymentToken.mint(FIRST, initialTokensAmount);
     await paymentToken.mint(SECOND, initialTokensAmount);
@@ -110,20 +100,7 @@ describe("VaultFactory", () => {
     it("should get exception if try to call init function twice", async () => {
       const vaultImpl2 = await ethers.deployContract("Vault");
 
-      await expect(vaultFactory.initialize(vaultImpl2)).to.be.revertedWithCustomError(
-        vaultFactory,
-        "InvalidInitialization",
-      );
-    });
-
-    it("should get exception if not an owner try to call secondStepInitialize function", async () => {
-      await expect(vaultFactory.connect(FIRST).secondStepInitialize(FIRST))
-        .to.be.revertedWithCustomError(vaultFactory, "OwnableUnauthorizedAccount")
-        .withArgs(FIRST.address);
-    });
-
-    it("should get exception if try to call secondStepInitialize function twice", async () => {
-      await expect(vaultFactory.secondStepInitialize(FIRST)).to.be.revertedWithCustomError(
+      await expect(vaultFactory.initialize(vaultImpl2, subscriptionManager)).to.be.revertedWithCustomError(
         vaultFactory,
         "InvalidInitialization",
       );

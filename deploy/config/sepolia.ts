@@ -8,6 +8,7 @@ export const deployConfig: DeployConfig = {
     basePeriodDuration: 600n,
     vaultNameRetentionPeriod: 3600n,
     subscriptionSigner: "",
+    reservedTokensAmountPerAddress: wei(100, 18),
     paymentTokenConfigs: [
       {
         paymentToken: "0xbb2e698669534eaBa3e276F17802723371178581",

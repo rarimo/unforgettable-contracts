@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IBaseSubscriptionModule} from "../../../interfaces/core/IBaseSubscriptionModule.sol";
+import {IBaseSubscriptionModule} from "../../../interfaces/core/subscription/IBaseSubscriptionModule.sol";
 
 contract BaseSubscriptionModule is IBaseSubscriptionModule {
     bytes32 private constant BASE_SUBSCRIPTION_MODULE_STORAGE_SLOT =

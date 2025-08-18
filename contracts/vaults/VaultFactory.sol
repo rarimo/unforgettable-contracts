@@ -17,7 +17,7 @@ import {ADeployerGuard} from "@solarity/solidity-lib/utils/ADeployerGuard.sol";
 
 import {IVault} from "../interfaces/vaults/IVault.sol";
 import {IVaultFactory} from "../interfaces/vaults/IVaultFactory.sol";
-import {IVaultSubscriptionManager} from "../interfaces/subscription/IVaultSubscriptionManager.sol";
+import {IVaultSubscriptionManager} from "../interfaces/vaults/IVaultSubscriptionManager.sol";
 
 import {TokensHelper} from "../libs/TokensHelper.sol";
 

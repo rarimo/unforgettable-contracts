@@ -5,7 +5,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
-import {ISignatureSubscriptionModule} from "../../../interfaces/core/ISignatureSubscriptionModule.sol";
+import {ISignatureSubscriptionModule} from "../../../interfaces/core/subscription/ISignatureSubscriptionModule.sol";
 
 import {EIP712SignatureChecker} from "../../../libs/EIP712SignatureChecker.sol";
 
@@ -43,18 +43,18 @@ contract SignatureSubscriptionModule is
     }
 
     function __SignatureSubscriptionModule_init(
-        address subscriptionSigner_
+        SigSubscriptionModuleInitData calldata initData_
     ) public onlyInitializing {
         __EIP712_init("SignatureSubscriptionModule", "v1.0.0");
 
-        _setSubscriptionSigner(subscriptionSigner_);
+        _setSubscriptionSigner(initData_.subscriptionSigner);
     }
 
     function buySubscriptionWithSignature(
         address account_,
         uint64 duration_,
         bytes memory signature_
-    ) external {
+    ) public virtual {
         _buySubscriptionWithSignature(msg.sender, account_, duration_, signature_);
     }
 

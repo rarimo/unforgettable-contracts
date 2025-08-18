@@ -6,7 +6,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import {IBurnableSBT} from "../../../interfaces/tokens/IBurnableSBT.sol";
-import {ISBTPaymentModule} from "../../../interfaces/core/ISBTPaymentModule.sol";
+import {ISBTPaymentModule} from "../../../interfaces/core/subscription/ISBTPaymentModule.sol";
 
 import {BaseSubscriptionModule} from "./BaseSubscriptionModule.sol";
 
@@ -39,10 +39,13 @@ contract SBTPaymentModule is ISBTPaymentModule, BaseSubscriptionModule, Initiali
     }
 
     function __SBTPaymentModule_init(
-        SBTUpdateEntry[] calldata sbtEntries_
+        SBTPaymentModuleInitData calldata initData_
     ) public onlyInitializing {
-        for (uint256 i = 0; i < sbtEntries_.length; ++i) {
-            _updateSBT(sbtEntries_[i].sbt, sbtEntries_[i].subscriptionDurationPerToken);
+        for (uint256 i = 0; i < initData_.sbtEntries.length; ++i) {
+            _updateSBT(
+                initData_.sbtEntries[i].sbt,
+                initData_.sbtEntries[i].subscriptionDurationPerToken
+            );
         }
     }
 

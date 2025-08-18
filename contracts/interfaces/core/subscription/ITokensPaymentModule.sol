@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-interface ITokensPaymentModule {
+import {IBaseSubscriptionModule} from "./IBaseSubscriptionModule.sol";
+
+interface ITokensPaymentModule is IBaseSubscriptionModule {
     struct PaymentTokenUpdateEntry {
         address paymentToken;
         uint256 baseSubscriptionCost;

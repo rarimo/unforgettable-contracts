@@ -8,7 +8,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 
 import {PERCENTAGE_100} from "@solarity/solidity-lib/utils/Globals.sol";
 
-import {ITokensPaymentModule} from "../../../interfaces/core/ITokensPaymentModule.sol";
+import {ITokensPaymentModule} from "../../../interfaces/core/subscription/ITokensPaymentModule.sol";
 
 import {TokensHelper} from "../../../libs/TokensHelper.sol";
 

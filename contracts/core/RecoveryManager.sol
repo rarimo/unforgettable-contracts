@@ -8,11 +8,11 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 
 import {ADeployerGuard} from "@solarity/solidity-lib/utils/ADeployerGuard.sol";
 
-import {IRecoveryManager} from "./interfaces/IRecoveryManager.sol";
-import {ISubscriptionManager} from "./interfaces/subscription/ISubscriptionManager.sol";
-import {IRecoveryStrategy} from "./interfaces/strategies/IRecoveryStrategy.sol";
+import {IRecoveryManager} from "../interfaces/core/IRecoveryManager.sol";
+import {ISubscriptionManager} from "../interfaces/core/ISubscriptionManager.sol";
+import {IRecoveryStrategy} from "../interfaces/core/strategies/IRecoveryStrategy.sol";
 
-import {TokensHelper} from "./libs/TokensHelper.sol";
+import {TokensHelper} from "../libs/TokensHelper.sol";
 
 contract RecoveryManager is IRecoveryManager, ADeployerGuard, OwnableUpgradeable {
     using EnumerableSet for *;
@@ -111,7 +111,7 @@ contract RecoveryManager is IRecoveryManager, ADeployerGuard, OwnableUpgradeable
 
         IRecoveryStrategy(getStrategy(recoveryMethod_.strategyId)).recoverAccount(
             msg.sender,
-            abi.decode(object_, (address)),
+            object_,
             abi.encode(recoveryMethod_.recoveryData, recoveryProof_)
         );
     }
@@ -331,7 +331,7 @@ contract RecoveryManager is IRecoveryManager, ADeployerGuard, OwnableUpgradeable
     function _validateRecoveryMethod(RecoveryMethod memory recoveryMethod_) internal view {
         _hasStrategyStatus(recoveryMethod_.strategyId, StrategyStatus.Active);
 
-        IRecoveryStrategy(getStrategy(recoveryMethod_.strategyId)).validateAccountRecoveryData(
+        IRecoveryStrategy(getStrategy(recoveryMethod_.strategyId)).validateRecoveryData(
             recoveryMethod_.recoveryData
         );
     }

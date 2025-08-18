@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-interface ISBTPaymentModule {
+import {IBaseSubscriptionModule} from "./IBaseSubscriptionModule.sol";
+
+interface ISBTPaymentModule is IBaseSubscriptionModule {
     struct SBTUpdateEntry {
         address sbt;
         uint64 subscriptionDurationPerToken;
+    }
+
+    struct SBTPaymentModuleInitData {
+        SBTUpdateEntry[] sbtEntries;
     }
 
     error NotSupportedSBT(address sbt);

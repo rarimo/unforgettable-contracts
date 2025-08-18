@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {NoncesUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/NoncesUpgradeable.sol";
 
-import {IRecoveryStrategy} from "../interfaces/strategies/IRecoveryStrategy.sol";
+import {IRecoveryStrategy} from "../../interfaces/core/strategies/IRecoveryStrategy.sol";
 
 abstract contract ARecoveryStrategy is IRecoveryStrategy, NoncesUpgradeable {
     bytes32 public constant A_RECOVERY_STRATEGY_STORAGE_SLOT =
@@ -38,32 +38,29 @@ abstract contract ARecoveryStrategy is IRecoveryStrategy, NoncesUpgradeable {
 
     function recoverAccount(
         address account_,
-        address newOwner_,
+        bytes memory object_,
         bytes memory recoveryData_
-    ) external onlyRecoveryManager {
-        _recoverAccount(account_, newOwner_, recoveryData_);
+    ) external virtual onlyRecoveryManager {
+        _recoverAccount(account_, object_, recoveryData_);
     }
 
-    function getRecoveryManager() external view returns (address) {
+    function getRecoveryManager() public view virtual returns (address) {
         return _getARecoveryStrategyStorage().recoveryManagerAddr;
     }
 
-    function validateAccountRecoveryData(bytes memory recoveryData_) external view {
-        _validateAccountRecoveryData(recoveryData_);
+    function validateRecoveryData(bytes memory recoveryData_) external view {
+        _validateRecoveryData(recoveryData_);
     }
 
     function _recoverAccount(
         address account_,
-        address newOwner_,
+        bytes memory object_,
         bytes memory recoveryData_
     ) internal virtual;
 
-    function _validateAccountRecoveryData(bytes memory recoveryData_) internal view virtual;
+    function _validateRecoveryData(bytes memory recoveryData_) internal view virtual;
 
     function _onlyRecoveryManager() internal view {
-        require(
-            msg.sender == _getARecoveryStrategyStorage().recoveryManagerAddr,
-            NotARecoveryManager(msg.sender)
-        );
+        require(msg.sender == getRecoveryManager(), NotARecoveryManager(msg.sender));
     }
 }

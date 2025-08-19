@@ -37,8 +37,8 @@ contract BaseSubscriptionManager is
         _;
     }
 
-    modifier onlySubscriptionActivator() {
-        _onlySubscriptionActivator();
+    modifier onlySubscriptionCreator() {
+        _onlySubscriptionCreator();
         _;
     }
 
@@ -123,8 +123,8 @@ contract BaseSubscriptionManager is
         _setSubscriptionSigner(newSigner_);
     }
 
-    function activateSubscription(address account_) public virtual onlySubscriptionActivator {
-        _activateSubscription(account_);
+    function createSubscription(address account_) public virtual onlySubscriptionCreator {
+        _createSubscription(account_);
     }
 
     function buySubscription(
@@ -160,7 +160,7 @@ contract BaseSubscriptionManager is
         return _getBaseSubscriptionManagerStorage().recoveryManager;
     }
 
-    function isSubscriptionActivator(address account_) public view returns (bool) {
+    function isSubscriptionCreator(address account_) public view returns (bool) {
         return account_ == getRecoveryManager();
     }
 
@@ -172,12 +172,12 @@ contract BaseSubscriptionManager is
         emit RecoveryManagerUpdated(recoveryManager_);
     }
 
-    function _activateSubscription(address account_) internal virtual {
-        require(!hasSubscription(account_), SubscriptionAlreadyActivated(account_));
+    function _createSubscription(address account_) internal virtual {
+        require(!hasSubscription(account_), SubscriptionAlreadyCreated(account_));
 
         _extendSubscription(account_, 0);
 
-        emit SubscriptionActivated(account_, block.timestamp);
+        emit SubscriptionCreated(account_, block.timestamp);
     }
 
     // solhint-disable-next-line no-empty-blocks
@@ -187,7 +187,7 @@ contract BaseSubscriptionManager is
         require(msg.sender == getRecoveryManager(), NotARecoveryManager(msg.sender));
     }
 
-    function _onlySubscriptionActivator() internal view {
-        require(isSubscriptionActivator(msg.sender), NotASubscriptionActivator(msg.sender));
+    function _onlySubscriptionCreator() internal view {
+        require(isSubscriptionCreator(msg.sender), NotASubscriptionActivator(msg.sender));
     }
 }

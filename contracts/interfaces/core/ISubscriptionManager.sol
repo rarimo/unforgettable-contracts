@@ -12,18 +12,18 @@ interface ISubscriptionManager is
 {
     error NotARecoveryManager(address sender);
     error NotASubscriptionActivator(address sender);
-    error SubscriptionAlreadyActivated(address account);
+    error SubscriptionAlreadyCreated(address account);
 
     event RecoveryManagerUpdated(address recoveryManager);
-    event SubscriptionActivated(address indexed account, uint256 startTime);
+    event SubscriptionCreated(address indexed account, uint256 startTime);
 
     function pause() external;
 
     function unpause() external;
 
-    function activateSubscription(address account_) external;
+    function createSubscription(address account_) external;
 
     function getRecoveryManager() external view returns (address);
 
-    function isSubscriptionActivator(address account_) external returns (bool);
+    function isSubscriptionCreator(address account_) external returns (bool);
 }

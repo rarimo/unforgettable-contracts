@@ -245,10 +245,6 @@ contract RecoveryManager is IRecoveryManager, ADeployerGuard, OwnableUpgradeable
             subscribeData_.subscriptionManager
         );
 
-        if (!subscriptionManager_.hasSubscription(msg.sender)) {
-            subscriptionManager_.activateSubscription(msg.sender);
-        }
-
         if (subscribeData_.paymentTokenAddr != address(0)) {
             _buySubscriptionFor(
                 msg.sender,
@@ -256,6 +252,8 @@ contract RecoveryManager is IRecoveryManager, ADeployerGuard, OwnableUpgradeable
                 subscribeData_.paymentTokenAddr,
                 subscribeData_.duration
             );
+        } else if (!subscriptionManager_.hasSubscription(msg.sender)) {
+            subscriptionManager_.createSubscription(msg.sender);
         }
 
         uint256 firstRecoveryMethodId_ = recoveryData.nextRecoveryMethodId;

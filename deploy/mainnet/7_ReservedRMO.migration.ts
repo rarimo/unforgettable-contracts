@@ -11,7 +11,7 @@ export = async (deployer: Deployer) => {
 
   const reservedRMOInitData = ReservedRMO__factory.createInterface().encodeFunctionData("initialize(address,uint256)", [
     await vaultFactory.getAddress(),
-    config.vaultsConfig.reservedTokensAmountPerAddress,
+    config.reservedRMOConfig.reservedTokensAmountPerAddress,
   ]);
   const reservedRMO = await deployer.deployERC1967Proxy(ReservedRMO__factory, reservedRMOInitData, {
     name: "ReservedRMO",

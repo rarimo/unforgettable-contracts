@@ -1,25 +1,31 @@
-import { IVaultNameSubscriptionModule } from "@/generated-types/ethers/contracts/interfaces/subscription/IVaultSubscriptionManager";
-import { ISBTSubscriptionModule, ISubscriptionManager } from "@ethers-v6";
+import {
+  ISBTPaymentModule,
+  ISignatureSubscriptionModule,
+  ITokensPaymentModule,
+} from "@/generated-types/ethers/contracts/core/subscription/BaseSubscriptionManager";
+import { IVaultSubscriptionManager } from "@/generated-types/ethers/contracts/vaults/VaultSubscriptionManager";
 
 export type DeployConfig = {
   contractsOwner: string;
-  vaultsConfig: VaultsConfig;
+  reservedRMOConfig: ReservedRMOConfig;
+  vaultSubscriptionManagerConfig: VaultSubscriptionManagerConfig;
   accountSubscriptionManagerConfig: AccountSubscriptionManagerConfig;
 };
 
-export type VaultsConfig = {
-  basePeriodDuration: bigint;
-  vaultNameRetentionPeriod: bigint;
-  subscriptionSigner: string;
+export type ReservedRMOConfig = {
   reservedTokensAmountPerAddress: bigint;
-  paymentTokenConfigs: ISubscriptionManager.PaymentTokenUpdateEntryStruct[];
-  vaultPaymentTokenConfigs: IVaultNameSubscriptionModule.VaultPaymentTokenUpdateEntryStruct[];
-  sbtTokenConfigs: ISBTSubscriptionModule.SBTTokenUpdateEntryStruct[];
+};
+
+export type VaultSubscriptionManagerConfig = {
+  vaultNameRetentionPeriod: bigint;
+  vaultPaymentTokenEntries: IVaultSubscriptionManager.VaultPaymentTokenUpdateEntryStruct[];
+  paymentTokenModuleConfig: ITokensPaymentModule.TokensPaymentModuleInitDataStruct;
+  sbtPaymentModuleConfig: ISBTPaymentModule.SBTPaymentModuleInitDataStruct;
+  signatureSubscriptionModuleConfig: ISignatureSubscriptionModule.SigSubscriptionModuleInitDataStruct;
 };
 
 export type AccountSubscriptionManagerConfig = {
-  basePeriodDuration: bigint;
-  subscriptionSigner: string;
-  paymentTokenConfigs: ISubscriptionManager.PaymentTokenUpdateEntryStruct[];
-  sbtTokenConfigs: ISBTSubscriptionModule.SBTTokenUpdateEntryStruct[];
+  paymentTokenModuleConfig: ITokensPaymentModule.TokensPaymentModuleInitDataStruct;
+  sbtPaymentModuleConfig: ISBTPaymentModule.SBTPaymentModuleInitDataStruct;
+  signatureSubscriptionModuleConfig: ISignatureSubscriptionModule.SigSubscriptionModuleInitDataStruct;
 };

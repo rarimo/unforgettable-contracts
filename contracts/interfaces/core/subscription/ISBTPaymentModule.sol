@@ -26,5 +26,5 @@ interface ISBTPaymentModule is IBaseSubscriptionModule {
 
     function isSupportedSBT(address sbtToken_) external view returns (bool);
 
-    function getSubscriptionTimePerSBT(address sbtToken_) external view returns (uint64);
+    function getSubscriptionDurationPerSBT(address sbtToken_) external view returns (uint64);
 }

@@ -48,7 +48,7 @@ contract TokensPaymentModule is ITokensPaymentModule, BaseSubscriptionModule, In
     function __TokensPaymentModule_init(
         TokensPaymentModuleInitData calldata initData_
     ) public onlyInitializing {
-        _setBasePeriodDuration(initData_.basePaymentPeriod);
+        _setBasePaymentPeriod(initData_.basePaymentPeriod);
 
         for (uint256 i = 0; i < initData_.paymentTokenEntries.length; ++i) {
             _updatePaymentToken(
@@ -79,6 +79,10 @@ contract TokensPaymentModule is ITokensPaymentModule, BaseSubscriptionModule, In
 
     function getSubscriptionDurationFactor(uint64 duration_) public view returns (uint256) {
         return _getTokensPaymentModuleStorage().durationFactors[duration_];
+    }
+
+    function getPaymentTokens() public view returns (address[] memory) {
+        return _getTokensPaymentModuleStorage().paymentTokens.values();
     }
 
     function getSubscriptionCost(
@@ -134,10 +138,8 @@ contract TokensPaymentModule is ITokensPaymentModule, BaseSubscriptionModule, In
         return _getTokensPaymentModuleStorage().paymentTokens.contains(paymentToken_);
     }
 
-    function _setBasePeriodDuration(uint64 newBasePaymentPeriod_) internal virtual {
-        TokensPaymentModuleStorage storage $ = _getTokensPaymentModuleStorage();
-
-        $.basePaymentPeriod = newBasePaymentPeriod_;
+    function _setBasePaymentPeriod(uint64 newBasePaymentPeriod_) internal virtual {
+        _getTokensPaymentModuleStorage().basePaymentPeriod = newBasePaymentPeriod_;
 
         emit BasePaymentPeriodUpdated(newBasePaymentPeriod_);
     }

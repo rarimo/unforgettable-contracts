@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -156,6 +157,10 @@ contract BaseSubscriptionManager is
         super.buySubscriptionWithSignature(vault_, duration_, signature_);
     }
 
+    function implementation() external view returns (address) {
+        return ERC1967Utils.getImplementation();
+    }
+
     function getRecoveryManager() public view virtual returns (address) {
         return _getBaseSubscriptionManagerStorage().recoveryManager;
     }
@@ -188,6 +193,6 @@ contract BaseSubscriptionManager is
     }
 
     function _onlySubscriptionCreator() internal view {
-        require(isSubscriptionCreator(msg.sender), NotASubscriptionActivator(msg.sender));
+        require(isSubscriptionCreator(msg.sender), NotASubscriptionCreator(msg.sender));
     }
 }

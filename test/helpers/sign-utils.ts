@@ -115,11 +115,11 @@ export async function getWithdrawTokensSignature(
 }
 
 export async function getBuySubscriptionSignature(
-  vaultSubscriptionManager: VaultSubscriptionManager,
+  sigSubscriptionModule: any,
   account: SignerWithAddress,
   data: BuySubscriptionData,
 ): Promise<string> {
-  const domain = await getDomain(vaultSubscriptionManager as unknown as EIP712Upgradeable);
+  const domain = await getDomain(sigSubscriptionModule as unknown as EIP712Upgradeable);
 
   return await account.signTypedData(domain, BuySubscriptionTypes, {
     sender: data.sender,

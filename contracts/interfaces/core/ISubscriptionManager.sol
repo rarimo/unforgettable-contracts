@@ -11,7 +11,7 @@ interface ISubscriptionManager is
     ISignatureSubscriptionModule
 {
     error NotARecoveryManager(address sender);
-    error NotASubscriptionActivator(address sender);
+    error NotASubscriptionCreator(address sender);
     error SubscriptionAlreadyCreated(address account);
 
     event RecoveryManagerUpdated(address recoveryManager);
@@ -22,6 +22,8 @@ interface ISubscriptionManager is
     function unpause() external;
 
     function createSubscription(address account_) external;
+
+    function implementation() external view returns (address);
 
     function getRecoveryManager() external view returns (address);
 

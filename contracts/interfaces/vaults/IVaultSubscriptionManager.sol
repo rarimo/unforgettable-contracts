@@ -10,9 +10,9 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
     }
 
     struct VaultSubscriptionManagerInitData {
-        address recoveryManager;
         address vaultFactoryAddr;
         uint64 vaultNameRetentionPeriod;
+        address[] subscriptionCreators;
         VaultPaymentTokenUpdateEntry[] vaultPaymentTokenEntries;
         TokensPaymentModuleInitData tokensPaymentInitData;
         SBTPaymentModuleInitData sbtPaymentInitData;

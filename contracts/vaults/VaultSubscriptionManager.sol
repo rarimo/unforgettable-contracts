@@ -73,7 +73,7 @@ contract VaultSubscriptionManager is
         VaultSubscriptionManagerInitData calldata initData_
     ) external initializer onlyDeployer {
         __BaseSubscriptionManager_init(
-            initData_.recoveryManager,
+            initData_.subscriptionCreators,
             initData_.tokensPaymentInitData,
             initData_.sbtPaymentInitData,
             initData_.sigSubscriptionInitData

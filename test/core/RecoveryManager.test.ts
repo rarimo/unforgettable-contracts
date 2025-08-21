@@ -14,7 +14,7 @@ describe("RecoveryManager", () => {
   const reverter = new Reverter();
 
   const initialTokensAmount = wei(10000);
-  const basePeriodDuration = 3600n * 24n * 30n;
+  const basePaymentPeriod = 3600n * 24n * 30n;
 
   const paymentTokenSubscriptionCost = wei(5);
   const nativeSubscriptionCost = wei(1, 15);
@@ -50,29 +50,10 @@ describe("RecoveryManager", () => {
     recoveryManager = await ethers.getContractAt("RecoveryManager", await recoveryManagerProxy.getAddress());
 
     subscriptionManagerImpl = await ethers.deployContract("AccountSubscriptionManager");
-    const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
-      "initialize(address,uint64,address,(address,uint256)[],(address,uint64)[])",
-      [
-        await recoveryManager.getAddress(),
-        basePeriodDuration,
-        OWNER.address,
-        [
-          {
-            paymentToken: await paymentToken.getAddress(),
-            baseSubscriptionCost: paymentTokenSubscriptionCost,
-          },
-          {
-            paymentToken: ETHER_ADDR,
-            baseSubscriptionCost: nativeSubscriptionCost,
-          },
-        ],
-        [],
-      ],
-    );
 
     const subscriptionManagerProxy = await ethers.deployContract("ERC1967Proxy", [
       await subscriptionManagerImpl.getAddress(),
-      subscriptionManagerInitData,
+      "0x",
     ]);
     subscriptionManager = await ethers.getContractAt(
       "AccountSubscriptionManager",
@@ -83,6 +64,29 @@ describe("RecoveryManager", () => {
 
     await recoveryStrategy.initialize(await recoveryManager.getAddress());
     await recoveryManager.initialize([await subscriptionManager.getAddress()], [await recoveryStrategy.getAddress()]);
+    await subscriptionManager.initialize({
+      subscriptionCreators: [await recoveryManager.getAddress()],
+      tokensPaymentInitData: {
+        basePaymentPeriod: basePaymentPeriod,
+        durationFactorEntries: [],
+        paymentTokenEntries: [
+          {
+            paymentToken: await paymentToken.getAddress(),
+            baseSubscriptionCost: paymentTokenSubscriptionCost,
+          },
+          {
+            paymentToken: ETHER_ADDR,
+            baseSubscriptionCost: nativeSubscriptionCost,
+          },
+        ],
+      },
+      sbtPaymentInitData: {
+        sbtEntries: [],
+      },
+      sigSubscriptionInitData: {
+        subscriptionSigner: OWNER,
+      },
+    });
 
     await paymentToken.mint(FIRST, initialTokensAmount);
     await paymentToken.mint(SECOND, initialTokensAmount);
@@ -253,7 +257,7 @@ describe("RecoveryManager", () => {
           [
             await subscriptionManager.getAddress(),
             await paymentToken.getAddress(),
-            basePeriodDuration,
+            basePaymentPeriod,
             [[0n, accountRecoveryData]],
           ],
         ],
@@ -282,7 +286,7 @@ describe("RecoveryManager", () => {
 
       const subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
         ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
-        [[await subscriptionManager.getAddress(), ETHER_ADDR, basePeriodDuration, [[0n, accountRecoveryData]]]],
+        [[await subscriptionManager.getAddress(), ETHER_ADDR, basePaymentPeriod, [[0n, accountRecoveryData]]]],
       );
 
       const tx = await recoveryManager.connect(OWNER).subscribe(subscribeData, {
@@ -307,7 +311,7 @@ describe("RecoveryManager", () => {
     it("should subscribe with existing subscription correctly", async () => {
       await paymentToken.connect(SECOND).approve(subscriptionManager, paymentTokenSubscriptionCost);
 
-      await subscriptionManager.connect(SECOND).buySubscription(SECOND, paymentToken, basePeriodDuration);
+      await subscriptionManager.connect(SECOND).buySubscription(SECOND, paymentToken, basePaymentPeriod);
 
       const accountRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY1.address]);
 
@@ -335,7 +339,7 @@ describe("RecoveryManager", () => {
 
       let subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
         ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
-        [[await subscriptionManager.getAddress(), ZeroAddress, basePeriodDuration, [[0n, accountRecoveryData]]]],
+        [[await subscriptionManager.getAddress(), ZeroAddress, basePaymentPeriod, [[0n, accountRecoveryData]]]],
       );
 
       const tx = await recoveryManager.connect(SECOND).subscribe(subscribeData);
@@ -363,7 +367,7 @@ describe("RecoveryManager", () => {
           [
             await subscriptionManager.getAddress(),
             await paymentToken.getAddress(),
-            basePeriodDuration,
+            basePaymentPeriod,
             [[0n, accountRecoveryData]],
           ],
         ],
@@ -385,7 +389,7 @@ describe("RecoveryManager", () => {
           [
             await paymentToken.getAddress(),
             await paymentToken.getAddress(),
-            basePeriodDuration,
+            basePaymentPeriod,
             [[0n, accountRecoveryData]],
           ],
         ],
@@ -407,7 +411,7 @@ describe("RecoveryManager", () => {
           [
             await subscriptionManager.getAddress(),
             await paymentToken.getAddress(),
-            basePeriodDuration,
+            basePaymentPeriod,
             [[1n, accountRecoveryData]],
           ],
         ],
@@ -425,7 +429,7 @@ describe("RecoveryManager", () => {
           [
             await subscriptionManager.getAddress(),
             await paymentToken.getAddress(),
-            basePeriodDuration,
+            basePaymentPeriod,
             [[0n, invalidAccountRecoveryData]],
           ],
         ],
@@ -440,7 +444,7 @@ describe("RecoveryManager", () => {
     it("should get exception if try to subscribe without recovery methods", async () => {
       const subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
         ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
-        [[await subscriptionManager.getAddress(), ETHER_ADDR, basePeriodDuration, []]],
+        [[await subscriptionManager.getAddress(), ETHER_ADDR, basePaymentPeriod, []]],
       );
 
       await expect(recoveryManager.connect(OWNER).subscribe(subscribeData)).to.be.revertedWithCustomError(
@@ -462,7 +466,7 @@ describe("RecoveryManager", () => {
           [
             await subscriptionManager.getAddress(),
             await paymentToken.getAddress(),
-            basePeriodDuration * 2n,
+            basePaymentPeriod * 2n,
             [[0n, accountRecoveryData]],
           ],
         ],
@@ -493,7 +497,7 @@ describe("RecoveryManager", () => {
 
       let subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
         ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
-        [[await subscriptionManager.getAddress(), ZeroAddress, basePeriodDuration, [[0n, accountRecoveryData]]]],
+        [[await subscriptionManager.getAddress(), ZeroAddress, basePaymentPeriod, [[0n, accountRecoveryData]]]],
       );
 
       await recoveryManager.connect(FIRST).subscribe(subscribeData);
@@ -510,7 +514,7 @@ describe("RecoveryManager", () => {
 
       subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
         ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
-        [[await subscriptionManager.getAddress(), ZeroAddress, basePeriodDuration, [[0n, accountRecoveryData]]]],
+        [[await subscriptionManager.getAddress(), ZeroAddress, basePaymentPeriod, [[0n, accountRecoveryData]]]],
       );
 
       const tx = await recoveryManager.connect(FIRST).resubscribe(subscribeData);
@@ -540,7 +544,7 @@ describe("RecoveryManager", () => {
           [
             await subscriptionManager.getAddress(),
             await paymentToken.getAddress(),
-            basePeriodDuration * 3n,
+            basePaymentPeriod * 3n,
             [[0n, accountRecoveryData]],
           ],
         ],
@@ -550,7 +554,7 @@ describe("RecoveryManager", () => {
 
       let signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
         account: FIRST.address,
-        newOwner: SECOND.address,
+        object: encodeAddress(SECOND.address),
         nonce: 0n,
       });
 
@@ -565,7 +569,7 @@ describe("RecoveryManager", () => {
 
       signature = await getRecoverAccountSignature(recoveryStrategy, OWNER, {
         account: FIRST.address,
-        newOwner: SECOND.address,
+        object: subject,
         nonce: 0n,
       });
 
@@ -591,7 +595,7 @@ describe("RecoveryManager", () => {
           [
             await subscriptionManager.getAddress(),
             await paymentToken.getAddress(),
-            basePeriodDuration,
+            basePaymentPeriod,
             [[0n, accountRecoveryData]],
           ],
         ],
@@ -601,7 +605,7 @@ describe("RecoveryManager", () => {
 
       const signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
         account: FIRST.address,
-        newOwner: SECOND.address,
+        object: encodeAddress(SECOND.address),
         nonce: 0n,
       });
 
@@ -626,7 +630,7 @@ describe("RecoveryManager", () => {
           [
             await subscriptionManager.getAddress(),
             await paymentToken.getAddress(),
-            basePeriodDuration,
+            basePaymentPeriod,
             [[0n, accountRecoveryData]],
           ],
         ],
@@ -638,7 +642,7 @@ describe("RecoveryManager", () => {
 
       const signature = await getRecoverAccountSignature(recoveryStrategy, OWNER, {
         account: FIRST.address,
-        newOwner: SECOND.address,
+        object: encodeAddress(SECOND.address),
         nonce: 0n,
       });
 
@@ -674,7 +678,7 @@ describe("RecoveryManager", () => {
           [
             await subscriptionManager.getAddress(),
             await paymentToken.getAddress(),
-            basePeriodDuration,
+            basePaymentPeriod,
             [[0n, accountRecoveryData]],
           ],
         ],
@@ -682,11 +686,11 @@ describe("RecoveryManager", () => {
 
       await recoveryManager.connect(SECOND).subscribe(subscribeData);
 
-      await time.increaseTo(BigInt(await time.latest()) + basePeriodDuration);
+      await time.increaseTo(BigInt(await time.latest()) + basePaymentPeriod);
 
       let signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
         account: SECOND.address,
-        newOwner: OWNER.address,
+        object: encodeAddress(OWNER.address),
         nonce: 0n,
       });
 

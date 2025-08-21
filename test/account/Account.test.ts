@@ -18,7 +18,7 @@ describe("Account", () => {
   const reverter = new Reverter();
 
   const initialTokensAmount = wei(10000);
-  const basePeriodDuration = 3600n * 24n * 30n;
+  const basePaymentPeriod = 3600n * 24n * 30n;
 
   const paymentTokenSubscriptionCost = wei(5);
 
@@ -39,6 +39,10 @@ describe("Account", () => {
 
   let account: AccountMock;
 
+  function encodeAddress(address: string): string {
+    return ethers.AbiCoder.defaultAbiCoder().encode(["address"], [address]);
+  }
+
   before(async () => {
     [OWNER, FIRST, SECOND, MASTER_KEY1] = await ethers.getSigners();
 
@@ -53,25 +57,10 @@ describe("Account", () => {
     recoveryManager = await ethers.getContractAt("RecoveryManager", await recoveryManagerProxy.getAddress());
 
     subscriptionManagerImpl = await ethers.deployContract("AccountSubscriptionManager");
-    const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
-      "initialize(address,uint64,address,(address,uint256)[],(address,uint64)[])",
-      [
-        await recoveryManager.getAddress(),
-        basePeriodDuration,
-        OWNER.address,
-        [
-          {
-            paymentToken: await paymentToken.getAddress(),
-            baseSubscriptionCost: paymentTokenSubscriptionCost,
-          },
-        ],
-        [],
-      ],
-    );
 
     const subscriptionManagerProxy = await ethers.deployContract("ERC1967Proxy", [
       await subscriptionManagerImpl.getAddress(),
-      subscriptionManagerInitData,
+      "0x",
     ]);
     subscriptionManager = await ethers.getContractAt(
       "AccountSubscriptionManager",
@@ -82,6 +71,25 @@ describe("Account", () => {
 
     await recoveryStrategy.initialize(await recoveryManager.getAddress());
     await recoveryManager.initialize([await subscriptionManager.getAddress()], [await recoveryStrategy.getAddress()]);
+    await subscriptionManager.initialize({
+      subscriptionCreators: [await recoveryManager.getAddress()],
+      tokensPaymentInitData: {
+        basePaymentPeriod: basePaymentPeriod,
+        durationFactorEntries: [],
+        paymentTokenEntries: [
+          {
+            paymentToken: await paymentToken.getAddress(),
+            baseSubscriptionCost: paymentTokenSubscriptionCost,
+          },
+        ],
+      },
+      sbtPaymentInitData: {
+        sbtEntries: [],
+      },
+      sigSubscriptionInitData: {
+        subscriptionSigner: OWNER,
+      },
+    });
 
     account = await ethers.deployContract("AccountMock", [MASTER_KEY1.address]);
 
@@ -114,7 +122,7 @@ describe("Account", () => {
         [
           await subscriptionManager.getAddress(),
           await paymentToken.getAddress(),
-          basePeriodDuration,
+          basePaymentPeriod,
           [[0n, accountRecoveryData]],
         ],
       ],
@@ -161,7 +169,7 @@ describe("Account", () => {
 
       let signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
         account: await account.getAddress(),
-        newOwner: SECOND.address,
+        object: encodeAddress(SECOND.address),
         nonce: 0n,
       });
 
@@ -180,7 +188,7 @@ describe("Account", () => {
 
       signature = await getRecoverAccountSignature(recoveryStrategy, OWNER, {
         account: await account.getAddress(),
-        newOwner: SECOND.address,
+        object: encodeAddress(SECOND.address),
         nonce: 0n,
       });
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.0;
 
-import {Account} from "../../account/Account.sol";
+import {Account} from "../../accounts/Account.sol";
 
 contract AccountMock is Account {
     constructor(address trustedExecutor_) {

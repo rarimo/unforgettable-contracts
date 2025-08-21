@@ -25,7 +25,7 @@ interface ISubscriptionManager is
 
     function implementation() external view returns (address);
 
-    function getRecoveryManager() external view returns (address);
+    function getSubscriptionCreators() external view returns (address[] memory);
 
     function isSubscriptionCreator(address account_) external returns (bool);
 }

@@ -39,21 +39,21 @@ export = async (deployer: Deployer) => {
   );
 
   await vaultSubscriptionManager.initialize({
-    recoveryManager: await recoveryManager.getAddress(),
     vaultFactoryAddr: await vaultFactory.getAddress(),
     vaultNameRetentionPeriod: config.vaultSubscriptionManagerConfig.vaultNameRetentionPeriod,
+    subscriptionCreators: [],
     vaultPaymentTokenEntries: config.vaultSubscriptionManagerConfig.vaultPaymentTokenEntries,
     tokensPaymentInitData: config.vaultSubscriptionManagerConfig.paymentTokenModuleConfig,
     sbtPaymentInitData: config.vaultSubscriptionManagerConfig.sbtPaymentModuleConfig,
     sigSubscriptionInitData: config.vaultSubscriptionManagerConfig.signatureSubscriptionModuleConfig,
   });
 
-  await accountSubscriptionManager.initialize(
-    await recoveryManager.getAddress(),
-    config.accountSubscriptionManagerConfig.paymentTokenModuleConfig,
-    config.accountSubscriptionManagerConfig.sbtPaymentModuleConfig,
-    config.accountSubscriptionManagerConfig.signatureSubscriptionModuleConfig,
-  );
+  await accountSubscriptionManager.initialize({
+    subscriptionCreators: [await recoveryManager.getAddress()],
+    tokensPaymentInitData: config.accountSubscriptionManagerConfig.paymentTokenModuleConfig,
+    sbtPaymentInitData: config.accountSubscriptionManagerConfig.sbtPaymentModuleConfig,
+    sigSubscriptionInitData: config.accountSubscriptionManagerConfig.signatureSubscriptionModuleConfig,
+  });
 
   await vaultFactory.initialize(await vaultImpl.getAddress(), await vaultSubscriptionManager.getAddress());
 };

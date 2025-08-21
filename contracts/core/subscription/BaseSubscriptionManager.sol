@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
@@ -16,7 +17,7 @@ import {SBTPaymentModule} from "./modules/SBTPaymentModule.sol";
 import {TokensPaymentModule} from "./modules/TokensPaymentModule.sol";
 import {SignatureSubscriptionModule} from "./modules/SignatureSubscriptionModule.sol";
 
-contract BaseSubscriptionManager is
+abstract contract BaseSubscriptionManager is
     ISubscriptionManager,
     TokensPaymentModule,
     SBTPaymentModule,
@@ -26,20 +27,22 @@ contract BaseSubscriptionManager is
     PausableUpgradeable,
     UUPSUpgradeable
 {
+    using EnumerableSet for EnumerableSet.AddressSet;
+
     bytes32 private constant BASE_SUBSCRIPTION_MANAGER_STORAGE_SLOT =
         keccak256("unforgettable.contract.base.subscription.manager.storage");
 
     struct BaseSubscriptionManagerStorage {
-        address recoveryManager;
+        EnumerableSet.AddressSet subscriptionCreators;
     }
 
-    modifier onlyRecoveryManager() {
-        _onlyRecoveryManager();
-        _;
-    }
+    error SubscriptionCreatorAlreadyAdded(address subscriptionCreator);
+
+    event SubscriptionCreatorAdded(address indexed subscriptionCreator);
+    event SubscriptionCreatorRemoved(address indexed subscriptionCreator);
 
     modifier onlySubscriptionCreator() {
-        _onlySubscriptionCreator();
+        _onlySubscriptionCreator(msg.sender);
         _;
     }
 
@@ -56,7 +59,7 @@ contract BaseSubscriptionManager is
     }
 
     function __BaseSubscriptionManager_init(
-        address recoveryManager_,
+        address[] calldata subscriptionCreators_,
         TokensPaymentModuleInitData calldata tokensPaymentInitData_,
         SBTPaymentModuleInitData calldata sbtPaymentInitData_,
         SigSubscriptionModuleInitData calldata sigSubscriptionInitData_
@@ -64,7 +67,9 @@ contract BaseSubscriptionManager is
         __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
 
-        _setRecoveryManager(recoveryManager_);
+        for (uint256 i = 0; i < subscriptionCreators_.length; ++i) {
+            _addSubscriptionCreator(subscriptionCreators_[i]);
+        }
 
         __TokensPaymentModule_init(tokensPaymentInitData_);
         __SBTPaymentModule_init(sbtPaymentInitData_);
@@ -161,20 +166,31 @@ contract BaseSubscriptionManager is
         return ERC1967Utils.getImplementation();
     }
 
-    function getRecoveryManager() public view virtual returns (address) {
-        return _getBaseSubscriptionManagerStorage().recoveryManager;
+    function getSubscriptionCreators() public view virtual returns (address[] memory) {
+        return _getBaseSubscriptionManagerStorage().subscriptionCreators.values();
     }
 
-    function isSubscriptionCreator(address account_) public view returns (bool) {
-        return account_ == getRecoveryManager();
+    function isSubscriptionCreator(address account_) public view virtual returns (bool) {
+        return _getBaseSubscriptionManagerStorage().subscriptionCreators.contains(account_);
     }
 
-    function _setRecoveryManager(address recoveryManager_) internal virtual {
-        _checkAddress(recoveryManager_, "RecoveryManager");
+    function _addSubscriptionCreator(address subscriptionCreator_) internal virtual {
+        _checkAddress(subscriptionCreator_, "SubscriptionCreator");
 
-        _getBaseSubscriptionManagerStorage().recoveryManager = recoveryManager_;
+        require(
+            _getBaseSubscriptionManagerStorage().subscriptionCreators.add(subscriptionCreator_),
+            SubscriptionCreatorAlreadyAdded(subscriptionCreator_)
+        );
 
-        emit RecoveryManagerUpdated(recoveryManager_);
+        emit SubscriptionCreatorAdded(subscriptionCreator_);
+    }
+
+    function _removeSubscriptionCreator(address subscriptionCreator_) internal virtual {
+        _onlySubscriptionCreator(subscriptionCreator_);
+
+        _getBaseSubscriptionManagerStorage().subscriptionCreators.remove(subscriptionCreator_);
+
+        emit SubscriptionCreatorRemoved(subscriptionCreator_);
     }
 
     function _createSubscription(address account_) internal virtual {
@@ -188,11 +204,7 @@ contract BaseSubscriptionManager is
     // solhint-disable-next-line no-empty-blocks
     function _authorizeUpgrade(address newImplementation_) internal override onlyOwner {}
 
-    function _onlyRecoveryManager() internal view {
-        require(msg.sender == getRecoveryManager(), NotARecoveryManager(msg.sender));
-    }
-
-    function _onlySubscriptionCreator() internal view {
-        require(isSubscriptionCreator(msg.sender), NotASubscriptionCreator(msg.sender));
+    function _onlySubscriptionCreator(address creator_) internal view {
+        require(isSubscriptionCreator(creator_), NotASubscriptionCreator(creator_));
     }
 }

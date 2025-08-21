@@ -17,9 +17,9 @@ import {
 describe("Vault", () => {
   const reverter = new Reverter();
 
-  const basePeriodDuration = 3600n * 24n * 30n;
+  const basePaymentPeriod = 3600n * 24n * 30n;
   const nativeSubscriptionCost = wei(1, 15);
-  const initialSubscriptionDuration = basePeriodDuration * 12n;
+  const initialSubscriptionDuration = basePaymentPeriod * 12n;
 
   let OWNER: SignerWithAddress;
   let SUBSCRIPTION_SIGNER: SignerWithAddress;
@@ -57,24 +57,31 @@ describe("Vault", () => {
 
     await vaultFactory.initialize(vaultImpl, subscriptionManager);
     await subscriptionManager.initialize({
-      recoveryManager: OWNER,
+      subscriptionCreators: [],
       vaultFactoryAddr: await vaultFactory.getAddress(),
-      subscriptionSigner: SUBSCRIPTION_SIGNER.address,
-      basePeriodDuration,
       vaultNameRetentionPeriod: 3600n * 24n,
-      basePaymentTokenEntries: [
-        {
-          paymentToken: ETHER_ADDR,
-          baseSubscriptionCost: nativeSubscriptionCost,
-        },
-      ],
       vaultPaymentTokenEntries: [
         {
           paymentToken: ETHER_ADDR,
           baseVaultNameCost: nativeSubscriptionCost,
         },
       ],
-      sbtTokenEntries: [],
+      tokensPaymentInitData: {
+        basePaymentPeriod: basePaymentPeriod,
+        durationFactorEntries: [],
+        paymentTokenEntries: [
+          {
+            paymentToken: ETHER_ADDR,
+            baseSubscriptionCost: nativeSubscriptionCost,
+          },
+        ],
+      },
+      sbtPaymentInitData: {
+        sbtEntries: [],
+      },
+      sigSubscriptionInitData: {
+        subscriptionSigner: SUBSCRIPTION_SIGNER,
+      },
     });
 
     const creatorNonce = await vaultFactory.nonces(FIRST);
@@ -341,7 +348,7 @@ describe("Vault", () => {
         nonce: currentNonce,
       });
 
-      const subscriptionEndTime = await subscriptionManager.getAccountSubscriptionEndTime(await vault.getAddress());
+      const subscriptionEndTime = await subscriptionManager.getSubscriptionEndTime(await vault.getAddress());
 
       await time.increaseTo(subscriptionEndTime + 100n);
 

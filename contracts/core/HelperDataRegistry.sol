@@ -39,13 +39,13 @@ contract HelperDataRegistry is EIP712Upgradeable {
 
         require(!isHelperDataSet(signer_), HelperDataAlreadySet(signer_));
 
-        _getRecoveryManagerStorage().accountsToHelperData[signer_] = helperData_;
+        _getHelperDataRegistryStorage().accountsToHelperData[signer_] = helperData_;
 
         emit HelperDataSet(signer_);
     }
 
     function getHelperData(address account_) external view returns (HelperData memory) {
-        return _getRecoveryManagerStorage().accountsToHelperData[account_];
+        return _getHelperDataRegistryStorage().accountsToHelperData[account_];
     }
 
     function hashHelperDataStruct(HelperData calldata helperData_) public view returns (bytes32) {
@@ -64,10 +64,11 @@ contract HelperDataRegistry is EIP712Upgradeable {
     }
 
     function isHelperDataSet(address account_) public view returns (bool) {
-        return _getRecoveryManagerStorage().accountsToHelperData[account_].helperDataVersion != 0;
+        return
+            _getHelperDataRegistryStorage().accountsToHelperData[account_].helperDataVersion != 0;
     }
 
-    function _getRecoveryManagerStorage()
+    function _getHelperDataRegistryStorage()
         private
         pure
         returns (HelperDataRegistryStorage storage _hdrs)

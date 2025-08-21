@@ -42,7 +42,7 @@ export const UpdateVaultNameTypes: Record<string, TypedDataField[]> = {
 export const RecoverAccountTypes: Record<string, TypedDataField[]> = {
   SignatureRecovery: [
     { name: "account", type: "address" },
-    { name: "newOwner", type: "address" },
+    { name: "objectHash", type: "bytes32" },
     { name: "nonce", type: "uint256" },
   ],
 };

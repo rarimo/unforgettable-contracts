@@ -19,8 +19,12 @@ function validateConfig(config: DeployConfig): DeployConfig {
     throw new Error("Invalid contracts address");
   }
 
-  if (!ethers.isAddress(config.vaultsConfig.subscriptionSigner)) {
+  if (!ethers.isAddress(config.vaultSubscriptionManagerConfig.signatureSubscriptionModuleConfig.subscriptionSigner)) {
     throw new Error("Invalid vault subscription signer");
+  }
+
+  if (!ethers.isAddress(config.accountSubscriptionManagerConfig.signatureSubscriptionModuleConfig.subscriptionSigner)) {
+    throw new Error("Invalid account subscription signer");
   }
 
   return config;

@@ -11,7 +11,7 @@ describe("VaultFactory", () => {
   const reverter = new Reverter();
 
   const initialTokensAmount = wei(10000);
-  const basePeriodDuration = 3600n * 24n * 30n;
+  const basePaymentPeriod = 3600n * 24n * 30n;
 
   const nativeSubscriptionCost = wei(1, 15);
   const paymentTokenSubscriptionCost = wei(5);
@@ -53,21 +53,9 @@ describe("VaultFactory", () => {
 
     await vaultFactory.initialize(vaultImpl, subscriptionManager);
     await subscriptionManager.initialize({
-      recoveryManager: OWNER,
+      subscriptionCreators: [],
       vaultFactoryAddr: await vaultFactory.getAddress(),
-      subscriptionSigner: SUBSCRIPTION_SIGNER.address,
-      basePeriodDuration,
       vaultNameRetentionPeriod: 3600n * 24n,
-      basePaymentTokenEntries: [
-        {
-          paymentToken: ETHER_ADDR,
-          baseSubscriptionCost: nativeSubscriptionCost,
-        },
-        {
-          paymentToken: await paymentToken.getAddress(),
-          baseSubscriptionCost: paymentTokenSubscriptionCost,
-        },
-      ],
       vaultPaymentTokenEntries: [
         {
           paymentToken: ETHER_ADDR,
@@ -78,7 +66,26 @@ describe("VaultFactory", () => {
           baseVaultNameCost: paymentTokenSubscriptionCost,
         },
       ],
-      sbtTokenEntries: [],
+      tokensPaymentInitData: {
+        basePaymentPeriod: basePaymentPeriod,
+        durationFactorEntries: [],
+        paymentTokenEntries: [
+          {
+            paymentToken: ETHER_ADDR,
+            baseSubscriptionCost: nativeSubscriptionCost,
+          },
+          {
+            paymentToken: await paymentToken.getAddress(),
+            baseSubscriptionCost: paymentTokenSubscriptionCost,
+          },
+        ],
+      },
+      sbtPaymentInitData: {
+        sbtEntries: [],
+      },
+      sigSubscriptionInitData: {
+        subscriptionSigner: SUBSCRIPTION_SIGNER,
+      },
     });
 
     await paymentToken.mint(FIRST, initialTokensAmount);
@@ -193,7 +200,7 @@ describe("VaultFactory", () => {
   });
 
   describe("#deployVault", () => {
-    const initialSubscriptionDuration = basePeriodDuration * 12n;
+    const initialSubscriptionDuration = basePaymentPeriod * 12n;
 
     it("should correctly deploy new vault and buy subscription with ERC20 tokens", async () => {
       const creatorNonce = await vaultFactory.nonces(FIRST);
@@ -227,7 +234,7 @@ describe("VaultFactory", () => {
 
       expect(await deployedVault.owner()).to.be.eq(MASTER_KEY1);
 
-      expect(await subscriptionManager.getVault("abc")).to.be.eq(expectedVaultAddr);
+      expect(await subscriptionManager.getVaultByName("abc")).to.be.eq(expectedVaultAddr);
       expect(await subscriptionManager.getVaultName(expectedVaultAddr)).to.be.eq("abc");
 
       await expect(tx).to.changeTokenBalances(

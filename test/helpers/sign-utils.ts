@@ -11,6 +11,7 @@ import { EIP712Upgradeable, SignatureRecoveryStrategy, Vault, VaultSubscriptionM
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
 import { TypedDataDomain } from "ethers";
+import { ethers } from "hardhat";
 
 export interface UpdateDisabledStatusData {
   enabled: boolean;
@@ -43,7 +44,7 @@ export interface UpdateVaultNameData {
 
 export interface RecoverAccountData {
   account: string;
-  newOwner: string;
+  object: string;
   nonce: bigint;
 }
 
@@ -115,11 +116,11 @@ export async function getWithdrawTokensSignature(
 }
 
 export async function getBuySubscriptionSignature(
-  vaultSubscriptionManager: VaultSubscriptionManager,
+  sigSubscriptionModule: any,
   account: SignerWithAddress,
   data: BuySubscriptionData,
 ): Promise<string> {
-  const domain = await getDomain(vaultSubscriptionManager as unknown as EIP712Upgradeable);
+  const domain = await getDomain(sigSubscriptionModule as unknown as EIP712Upgradeable);
 
   return await account.signTypedData(domain, BuySubscriptionTypes, {
     sender: data.sender,
@@ -151,7 +152,7 @@ export async function getRecoverAccountSignature(
 
   return await account.signTypedData(domain, RecoverAccountTypes, {
     account: data.account,
-    newOwner: data.newOwner,
+    objectHash: ethers.keccak256(data.object),
     nonce: data.nonce,
   });
 }

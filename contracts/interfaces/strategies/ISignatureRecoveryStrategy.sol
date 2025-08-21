@@ -8,7 +8,7 @@ interface ISignatureRecoveryStrategy is IRecoveryStrategy {
 
     function hashSignatureRecovery(
         address account_,
-        address newOwner_,
+        bytes memory object_,
         uint256 nonce_
     ) external view returns (bytes32);
 }

@@ -548,9 +548,11 @@ describe("RecoveryManager", () => {
 
       await recoveryManager.connect(FIRST).subscribe(subscribeData);
 
+      const subject = encodeAddress(SECOND.address);
+
       let signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
         account: FIRST.address,
-        newOwner: SECOND.address,
+        objectHash: ethers.keccak256(subject),
         nonce: 0n,
       });
 
@@ -559,13 +561,11 @@ describe("RecoveryManager", () => {
         [await subscriptionManager.getAddress(), 0, signature],
       );
 
-      const subject = encodeAddress(SECOND.address);
-
       await recoveryManager.connect(FIRST).recover(subject, recoveryProof);
 
       signature = await getRecoverAccountSignature(recoveryStrategy, OWNER, {
         account: FIRST.address,
-        newOwner: SECOND.address,
+        objectHash: ethers.keccak256(subject),
         nonce: 0n,
       });
 
@@ -599,9 +599,11 @@ describe("RecoveryManager", () => {
 
       await recoveryManager.connect(FIRST).subscribe(subscribeData);
 
+      const subject = encodeAddress(SECOND.address);
+
       const signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
         account: FIRST.address,
-        newOwner: SECOND.address,
+        objectHash: ethers.keccak256(subject),
         nonce: 0n,
       });
 
@@ -612,7 +614,7 @@ describe("RecoveryManager", () => {
 
       await recoveryManager.connect(OWNER).disableStrategy(0);
 
-      await recoveryManager.connect(FIRST).recover(encodeAddress(SECOND.address), recoveryProof);
+      await recoveryManager.connect(FIRST).recover(subject, recoveryProof);
     });
 
     it("should get exception if try to recover without recovery method set", async () => {
@@ -636,9 +638,11 @@ describe("RecoveryManager", () => {
 
       await recoveryManager.connect(FIRST).unsubscribe();
 
+      const subject = encodeAddress(SECOND.address);
+
       const signature = await getRecoverAccountSignature(recoveryStrategy, OWNER, {
         account: FIRST.address,
-        newOwner: SECOND.address,
+        objectHash: ethers.keccak256(subject),
         nonce: 0n,
       });
 
@@ -646,8 +650,6 @@ describe("RecoveryManager", () => {
         ["address", "uint256", "bytes"],
         [await subscriptionManager.getAddress(), 0n, signature],
       );
-
-      const subject = encodeAddress(SECOND.address);
 
       await expect(recoveryManager.connect(FIRST).recover(subject, recoveryProof))
         .to.be.revertedWithCustomError(recoveryManager, "RecoveryMethodNotSet")
@@ -684,9 +686,11 @@ describe("RecoveryManager", () => {
 
       await time.increaseTo(BigInt(await time.latest()) + basePeriodDuration);
 
-      let signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
+      const subject = encodeAddress(OWNER.address);
+
+      const signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
         account: SECOND.address,
-        newOwner: OWNER.address,
+        objectHash: ethers.keccak256(subject),
         nonce: 0n,
       });
 
@@ -695,7 +699,7 @@ describe("RecoveryManager", () => {
         [await subscriptionManager.getAddress(), 0, signature],
       );
 
-      await expect(recoveryManager.connect(SECOND).recover(encodeAddress(OWNER.address), recoveryProof))
+      await expect(recoveryManager.connect(SECOND).recover(subject, recoveryProof))
         .to.be.revertedWithCustomError(recoveryManager, "NoActiveSubscription")
         .withArgs(await subscriptionManager.getAddress(), SECOND.address);
     });

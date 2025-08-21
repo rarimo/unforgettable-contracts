@@ -111,7 +111,7 @@ contract RecoveryManager is IRecoveryManager, ADeployerGuard, OwnableUpgradeable
 
         IRecoveryStrategy(getStrategy(recoveryMethod_.strategyId)).recoverAccount(
             msg.sender,
-            abi.decode(object_, (address)),
+            object_,
             abi.encode(recoveryMethod_.recoveryData, recoveryProof_)
         );
     }

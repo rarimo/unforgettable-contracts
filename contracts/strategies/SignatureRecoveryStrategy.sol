@@ -16,7 +16,7 @@ contract SignatureRecoveryStrategy is
     using EIP712SignatureChecker for address;
 
     bytes32 public constant SIGNATURE_RECOVERY_TYPEHASH =
-        keccak256("SignatureRecovery(address account,address newOwner,uint256 nonce)");
+        keccak256("SignatureRecovery(address account,bytes32 objectHash,uint256 nonce)");
 
     function initialize(address recoveryManagerAddr_) external initializer {
         __EIP712_init("SignatureRecoveryStrategy", "v1.0.0");
@@ -25,18 +25,20 @@ contract SignatureRecoveryStrategy is
 
     function hashSignatureRecovery(
         address account_,
-        address newOwner_,
+        bytes memory object_,
         uint256 nonce_
     ) public view returns (bytes32) {
         return
             _hashTypedDataV4(
-                keccak256(abi.encode(SIGNATURE_RECOVERY_TYPEHASH, account_, newOwner_, nonce_))
+                keccak256(
+                    abi.encode(SIGNATURE_RECOVERY_TYPEHASH, account_, keccak256(object_), nonce_)
+                )
             );
     }
 
     function _recoverAccount(
         address account_,
-        address newOwner_,
+        bytes memory object_,
         bytes memory recoveryDataRaw_
     ) internal override {
         (bytes memory accountRecoveryData_, bytes memory signature_) = abi.decode(
@@ -46,7 +48,7 @@ contract SignatureRecoveryStrategy is
         address recoveryKey_ = abi.decode(accountRecoveryData_, (address));
 
         // Verify EIP712 signature
-        bytes32 hash_ = hashSignatureRecovery(account_, newOwner_, _useNonce(account_));
+        bytes32 hash_ = hashSignatureRecovery(account_, object_, _useNonce(account_));
 
         recoveryKey_.checkSignature(hash_, signature_);
     }

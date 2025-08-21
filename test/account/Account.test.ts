@@ -159,9 +159,11 @@ describe("Account", () => {
     it("should recover ownership correctly", async () => {
       expect(await account.getTrustedExecutor()).to.be.eq(MASTER_KEY1);
 
+      const subject = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [SECOND.address]);
+
       let signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
         account: await account.getAddress(),
-        newOwner: SECOND.address,
+        objectHash: ethers.keccak256(subject),
         nonce: 0n,
       });
 
@@ -169,8 +171,6 @@ describe("Account", () => {
         ["address", "uint256", "bytes"],
         [await subscriptionManager.getAddress(), 0, signature],
       );
-
-      const subject = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [SECOND.address]);
 
       let tx = await account.connect(OWNER).recoverAccess(subject, recoveryManager, recoveryProof);
 
@@ -180,7 +180,7 @@ describe("Account", () => {
 
       signature = await getRecoverAccountSignature(recoveryStrategy, OWNER, {
         account: await account.getAddress(),
-        newOwner: SECOND.address,
+        objectHash: ethers.keccak256(subject),
         nonce: 0n,
       });
 

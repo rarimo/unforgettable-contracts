@@ -4,7 +4,7 @@ pragma solidity ^0.8.28;
 interface IRecoveryStrategy {
     function recoverAccount(
         address account_,
-        address newOwner_,
+        bytes memory object_,
         bytes memory recoveryData_
     ) external;
 

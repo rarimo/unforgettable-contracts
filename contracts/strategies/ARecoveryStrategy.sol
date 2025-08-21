@@ -38,10 +38,10 @@ abstract contract ARecoveryStrategy is IRecoveryStrategy, NoncesUpgradeable {
 
     function recoverAccount(
         address account_,
-        address newOwner_,
+        bytes memory object_,
         bytes memory recoveryData_
     ) external onlyRecoveryManager {
-        _recoverAccount(account_, newOwner_, recoveryData_);
+        _recoverAccount(account_, object_, recoveryData_);
     }
 
     function getRecoveryManager() external view returns (address) {
@@ -54,7 +54,7 @@ abstract contract ARecoveryStrategy is IRecoveryStrategy, NoncesUpgradeable {
 
     function _recoverAccount(
         address account_,
-        address newOwner_,
+        bytes memory object_,
         bytes memory recoveryData_
     ) internal virtual;
 

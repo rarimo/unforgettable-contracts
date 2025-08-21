@@ -7,7 +7,7 @@ import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/crypt
 
 import {IVault} from "../interfaces/vaults/IVault.sol";
 import {IVaultFactory} from "../interfaces/vaults/IVaultFactory.sol";
-import {ISubscriptionManager} from "../interfaces/subscription/ISubscriptionManager.sol";
+import {ISubscriptionManager} from "../interfaces/core/ISubscriptionManager.sol";
 
 import {TokensHelper} from "../libs/TokensHelper.sol";
 import {EIP712SignatureChecker} from "../libs/EIP712SignatureChecker.sol";

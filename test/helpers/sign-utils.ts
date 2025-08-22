@@ -7,7 +7,7 @@ import {
   VaultUpdateMasterKeyTypes,
   VaultWithdrawTokensTypes,
 } from "@/test/helpers/eip712types";
-import { EIP712Upgradeable, Safe, SignatureRecoveryStrategy, Vault, VaultSubscriptionManager } from "@ethers-v6";
+import { EIP712Upgradeable, SafeMock, SignatureRecoveryStrategy, Vault, VaultSubscriptionManager } from "@ethers-v6";
 
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
@@ -172,12 +172,12 @@ export async function getRecoverAccountSignature(
 }
 
 export async function getSafeTransactionSignature(
-  safe: Safe,
+  safe: SafeMock,
   account: SignerWithAddress,
   data: SafeTransactionData,
 ): Promise<string> {
   const domain: TypedDataDomain = {
-    chainId: await safe.getChainId(),
+    chainId: (await ethers.provider.getNetwork()).chainId,
     verifyingContract: await safe.getAddress(),
   };
 

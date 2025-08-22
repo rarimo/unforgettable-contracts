@@ -3,9 +3,9 @@ import {
   AccountSubscriptionManager,
   ERC20Mock,
   RecoveryManager,
-  Safe,
-  SafeRecoveryModule,
+  SafeMock,
   SignatureRecoveryStrategy,
+  UnforgettableRecoveryModule,
 } from "@ethers-v6";
 import { wei } from "@scripts";
 import { Reverter } from "@test-helpers";
@@ -16,13 +16,15 @@ import { expect } from "chai";
 import { ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
 
-describe("SafeRecoveryModule", () => {
+describe("UnforgettableRecoveryModule", () => {
   const reverter = new Reverter();
 
   const initialTokensAmount = wei(10000);
-  const basePeriodDuration = 3600n * 24n * 30n;
+  const basePaymentPeriod = 3600n * 24n * 30n;
 
   const paymentTokenSubscriptionCost = wei(5);
+
+  const sentinel = "0x0000000000000000000000000000000000000001";
 
   let OWNER: SignerWithAddress;
   let FIRST: SignerWithAddress;
@@ -40,9 +42,9 @@ describe("SafeRecoveryModule", () => {
 
   let paymentToken: ERC20Mock;
 
-  let accountImpl: Safe;
-  let account: Safe;
-  let recoveryModule: SafeRecoveryModule;
+  let accountImpl: SafeMock;
+  let account: SafeMock;
+  let recoveryModule: UnforgettableRecoveryModule;
 
   async function executeSafeTx(to: string, data: string, operation: bigint = 0n) {
     const value = 0n;
@@ -115,7 +117,7 @@ describe("SafeRecoveryModule", () => {
 
     const signatures = ethers.concat(tuples.map((t) => ethers.concat([t.r, t.s, t.v])));
 
-    await account.execTransaction(
+    return await account.execTransaction(
       to,
       value,
       data,
@@ -143,25 +145,10 @@ describe("SafeRecoveryModule", () => {
     recoveryManager = await ethers.getContractAt("RecoveryManager", await recoveryManagerProxy.getAddress());
 
     subscriptionManagerImpl = await ethers.deployContract("AccountSubscriptionManager");
-    const subscriptionManagerInitData = subscriptionManagerImpl.interface.encodeFunctionData(
-      "initialize(address,uint64,address,(address,uint256)[],(address,uint64)[])",
-      [
-        await recoveryManager.getAddress(),
-        basePeriodDuration,
-        OWNER.address,
-        [
-          {
-            paymentToken: await paymentToken.getAddress(),
-            baseSubscriptionCost: paymentTokenSubscriptionCost,
-          },
-        ],
-        [],
-      ],
-    );
 
     const subscriptionManagerProxy = await ethers.deployContract("ERC1967Proxy", [
       await subscriptionManagerImpl.getAddress(),
-      subscriptionManagerInitData,
+      "0x",
     ]);
     subscriptionManager = await ethers.getContractAt(
       "AccountSubscriptionManager",
@@ -172,14 +159,33 @@ describe("SafeRecoveryModule", () => {
 
     await recoveryStrategy.initialize(await recoveryManager.getAddress());
     await recoveryManager.initialize([await subscriptionManager.getAddress()], [await recoveryStrategy.getAddress()]);
+    await subscriptionManager.initialize({
+      subscriptionCreators: [await recoveryManager.getAddress()],
+      tokensPaymentInitData: {
+        basePaymentPeriod: basePaymentPeriod,
+        durationFactorEntries: [],
+        paymentTokenEntries: [
+          {
+            paymentToken: await paymentToken.getAddress(),
+            baseSubscriptionCost: paymentTokenSubscriptionCost,
+          },
+        ],
+      },
+      sbtPaymentInitData: {
+        sbtEntries: [],
+      },
+      sigSubscriptionInitData: {
+        subscriptionSigner: OWNER,
+      },
+    });
 
-    accountImpl = await ethers.deployContract("Safe");
+    accountImpl = await ethers.deployContract("SafeMock");
     const accountProxy = await ethers.deployContract("ERC1967Proxy", [await accountImpl.getAddress(), "0x"]);
-    account = await ethers.getContractAt("Safe", await accountProxy.getAddress());
+    account = await ethers.getContractAt("SafeMock", await accountProxy.getAddress());
 
     await account.setup([FIRST, SECOND, THIRD], 2, ZeroAddress, "0x", ZeroAddress, ZeroAddress, 0, ZeroAddress);
 
-    recoveryModule = await ethers.deployContract("SafeRecoveryModule");
+    recoveryModule = await ethers.deployContract("UnforgettableRecoveryModule");
 
     await paymentToken.mint(FIRST, initialTokensAmount);
     await paymentToken.mint(SECOND, initialTokensAmount);
@@ -218,7 +224,7 @@ describe("SafeRecoveryModule", () => {
           [
             await subscriptionManager.getAddress(),
             await paymentToken.getAddress(),
-            basePeriodDuration,
+            basePaymentPeriod,
             [
               [0n, accountRecoveryData1],
               [0n, accountRecoveryData2],
@@ -228,21 +234,30 @@ describe("SafeRecoveryModule", () => {
         ],
       );
 
+      const recoveryData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address[]", "bytes"],
+        [[FIRST.address, SECOND.address, THIRD.address], subscribeData],
+      );
+
       const addProviderData = recoveryModule.interface.encodeFunctionData("addRecoveryProvider", [
         await recoveryManager.getAddress(),
-        subscribeData,
+        recoveryData,
       ]);
 
-      await executeSafeTx(await recoveryModule.getAddress(), addProviderData, 1n);
+      let tx = await executeSafeTx(await recoveryModule.getAddress(), addProviderData, 1n);
 
-      let subject = ethers.AbiCoder.defaultAbiCoder().encode(
-        ["address", "address", "address"],
-        [await account.getAddress(), SECOND.address, OWNER.address],
+      await expect(tx)
+        .to.emit(account, "RecoveryProviderAdded")
+        .withArgs(await recoveryManager.getAddress());
+
+      let object = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "address", "address", "address"],
+        [await account.getAddress(), FIRST.address, SECOND.address, OWNER.address],
       );
 
       let signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY2, {
         account: await account.getAddress(),
-        objectHash: ethers.keccak256(subject),
+        object: object,
         nonce: 0n,
       });
 
@@ -253,20 +268,20 @@ describe("SafeRecoveryModule", () => {
 
       expect(await account.getOwners()).to.be.deep.eq([FIRST.address, SECOND.address, THIRD.address]);
 
-      let tx = await recoveryModule.connect(THIRD).recoverAccess(subject, recoveryManager, recoveryProof);
+      tx = await recoveryModule.connect(THIRD).recoverAccess(object, recoveryManager, recoveryProof);
 
-      await expect(tx).to.emit(recoveryModule, "AccessRecovered").withArgs(subject);
+      await expect(tx).to.emit(recoveryModule, "AccessRecovered").withArgs(object);
 
       expect(await account.getOwners()).to.be.deep.eq([FIRST.address, OWNER.address, THIRD.address]);
 
-      subject = ethers.AbiCoder.defaultAbiCoder().encode(
-        ["address", "address", "address"],
-        [await account.getAddress(), FIRST.address, SECOND.address],
+      object = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "address", "address", "address"],
+        [await account.getAddress(), sentinel, FIRST.address, SECOND.address],
       );
 
       signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY3, {
         account: await account.getAddress(),
-        objectHash: ethers.keccak256(subject),
+        object: object,
         nonce: 1n,
       });
 
@@ -276,7 +291,7 @@ describe("SafeRecoveryModule", () => {
       );
 
       await expect(
-        recoveryModule.connect(FIRST).recoverAccess(subject, recoveryManager, recoveryProof),
+        recoveryModule.connect(FIRST).recoverAccess(object, recoveryManager, recoveryProof),
       ).to.be.revertedWithCustomError(recoveryModule, "RecoverCallFailed");
 
       expect(await account.getOwners()).to.be.deep.eq([FIRST.address, OWNER.address, THIRD.address]);

@@ -203,8 +203,8 @@ describe("VaultFactory", () => {
     const initialSubscriptionDuration = basePaymentPeriod * 12n;
 
     it("should correctly deploy new vault and buy subscription with ERC20 tokens", async () => {
-      const creatorNonce = await vaultFactory.nonces(FIRST);
-      const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, FIRST, creatorNonce);
+      const masterKeyNonce = await vaultFactory.nonces(MASTER_KEY1);
+      const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, MASTER_KEY1, masterKeyNonce);
 
       const expectedSubscriptionCost = await subscriptionManager.getSubscriptionCost(
         expectedVaultAddr,
@@ -247,8 +247,8 @@ describe("VaultFactory", () => {
     });
 
     it("should correctly deploy new vault and buy subscription with native currency", async () => {
-      const creatorNonce = await vaultFactory.nonces(FIRST);
-      const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, FIRST, creatorNonce);
+      const masterKeyNonce = await vaultFactory.nonces(MASTER_KEY1);
+      const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, MASTER_KEY1, masterKeyNonce);
 
       const expectedSubscriptionCost = await subscriptionManager.getSubscriptionCost(
         expectedVaultAddr,

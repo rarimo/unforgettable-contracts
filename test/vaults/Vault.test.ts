@@ -84,8 +84,8 @@ describe("Vault", () => {
       },
     });
 
-    const creatorNonce = await vaultFactory.nonces(FIRST);
-    const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, FIRST, creatorNonce);
+    const masterKeyNonce = await vaultFactory.nonces(MASTER_KEY1);
+    const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, MASTER_KEY1, masterKeyNonce);
 
     const expectedSubscriptionCost = await subscriptionManager.getSubscriptionCost(
       expectedVaultAddr,

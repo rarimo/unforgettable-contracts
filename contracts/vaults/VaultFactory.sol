@@ -88,7 +88,7 @@ contract VaultFactory is
     ) external payable nonReentrant returns (address vaultAddr_) {
         VaultFactoryStorage storage $ = _getVaultFactoryStorage();
 
-        bytes32 salt_ = getDeployVaultSalt(msg.sender, _useNonce(msg.sender));
+        bytes32 salt_ = getDeployVaultSalt(masterKey_, _useNonce(masterKey_));
 
         vaultAddr_ = _deploy2($.vaultImplementation, salt_);
 
@@ -137,18 +137,18 @@ contract VaultFactory is
 
     function predictVaultAddress(
         address implementation_,
-        address creator_,
+        address masterKey_,
         uint256 nonce_
     ) external view returns (address) {
-        return _predictAddress(implementation_, getDeployVaultSalt(creator_, nonce_));
+        return _predictAddress(implementation_, getDeployVaultSalt(masterKey_, nonce_));
     }
 
     function implementation() external view returns (address) {
         return ERC1967Utils.getImplementation();
     }
 
-    function getDeployVaultSalt(address creator_, uint256 nonce_) public pure returns (bytes32) {
-        return keccak256(abi.encodePacked(creator_, nonce_));
+    function getDeployVaultSalt(address masterKey_, uint256 nonce_) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(masterKey_, nonce_));
     }
 
     function _updateVaultImplementation(address newVaultImpl_) internal {

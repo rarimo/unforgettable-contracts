@@ -7,4 +7,8 @@ contract RecoveryManagerMock {
     function createSubscription(address subscriptionManager_, address account_) external {
         ISubscriptionManager(subscriptionManager_).createSubscription(account_);
     }
+
+    function subscribe(bytes memory recoveryData_) external payable {}
+
+    function recover(bytes memory object_, bytes memory proof_) external {}
 }

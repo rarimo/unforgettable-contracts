@@ -6,6 +6,7 @@ import {
   SafeMock,
   SignatureRecoveryStrategy,
   UnforgettableRecoveryModule,
+  UnforgettableRecoveryModuleMock,
 } from "@ethers-v6";
 import { wei } from "@scripts";
 import { Reverter } from "@test-helpers";
@@ -44,7 +45,7 @@ describe("UnforgettableRecoveryModule", () => {
 
   let accountImpl: SafeMock;
   let account: SafeMock;
-  let recoveryModule: UnforgettableRecoveryModule;
+  let recoveryModule: UnforgettableRecoveryModuleMock;
 
   async function executeSafeTx(to: string, data: string, operation: bigint = 0n) {
     const value = 0n;
@@ -185,10 +186,9 @@ describe("UnforgettableRecoveryModule", () => {
 
     await account.setup([FIRST, SECOND, THIRD], 2, ZeroAddress, "0x", ZeroAddress, ZeroAddress, 0, ZeroAddress);
 
-    recoveryModule = await ethers.deployContract("UnforgettableRecoveryModule");
+    recoveryModule = await ethers.deployContract("UnforgettableRecoveryModuleMock");
 
-    await paymentToken.mint(FIRST, initialTokensAmount);
-    await paymentToken.mint(SECOND, initialTokensAmount);
+    await paymentToken.mint(account, initialTokensAmount);
 
     await reverter.snapshot();
   });
@@ -199,21 +199,357 @@ describe("UnforgettableRecoveryModule", () => {
     await executeSafeTx(await account.getAddress(), enableModuleData);
 
     expect(await account.isModuleEnabled(await recoveryModule.getAddress())).to.be.true;
+
+    const approveData = paymentToken.interface.encodeFunctionData("approve", [
+      await recoveryManager.getAddress(),
+      paymentTokenSubscriptionCost,
+    ]);
+
+    await executeSafeTx(await paymentToken.getAddress(), approveData);
   });
 
   afterEach(reverter.revert);
 
-  describe("recoverAccess", () => {
-    it("should swap owner correctly", async () => {
-      await paymentToken.connect(FIRST).transfer(account, paymentTokenSubscriptionCost);
+  describe("#addRecoveryProvider", () => {
+    it("should add recovery provider correctly", async () => {
+      const accountRecoveryData1 = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY1.address]);
+      const accountRecoveryData2 = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY2.address]);
+      const accountRecoveryData3 = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY3.address]);
 
-      const approveData = paymentToken.interface.encodeFunctionData("approve", [
+      let subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
+        [
+          [
+            await subscriptionManager.getAddress(),
+            await paymentToken.getAddress(),
+            basePaymentPeriod,
+            [
+              [0n, accountRecoveryData1],
+              [0n, accountRecoveryData3],
+            ],
+          ],
+        ],
+      );
+
+      let recoveryData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address[]", "bytes"],
+        [[FIRST.address, THIRD.address], subscribeData],
+      );
+
+      let addProviderData = recoveryModule.interface.encodeFunctionData("addRecoveryProvider", [
         await recoveryManager.getAddress(),
-        paymentTokenSubscriptionCost,
+        recoveryData,
       ]);
 
-      await executeSafeTx(await paymentToken.getAddress(), approveData);
+      let tx = await executeSafeTx(await recoveryModule.getAddress(), addProviderData, 1n);
 
+      await expect(tx)
+        .to.emit(account, "RecoveryProviderAdded")
+        .withArgs(await recoveryManager.getAddress());
+
+      const newRecoveryManager = await ethers.deployContract("RecoveryManagerMock");
+
+      subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
+        [
+          [
+            await subscriptionManager.getAddress(),
+            await paymentToken.getAddress(),
+            basePaymentPeriod,
+            [[0n, accountRecoveryData2]],
+          ],
+        ],
+      );
+
+      recoveryData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address[]", "bytes"],
+        [[SECOND.address], subscribeData],
+      );
+
+      addProviderData = recoveryModule.interface.encodeFunctionData("addRecoveryProvider", [
+        await newRecoveryManager.getAddress(),
+        recoveryData,
+      ]);
+
+      tx = await executeSafeTx(await recoveryModule.getAddress(), addProviderData, 1n);
+
+      await expect(tx)
+        .to.emit(account, "RecoveryProviderAdded")
+        .withArgs(await newRecoveryManager.getAddress());
+
+      let recoverableOwnersData = recoveryModule.interface.encodeFunctionData("getRecoverableOwners", [
+        await recoveryManager.getAddress(),
+      ]);
+
+      tx = await executeSafeTx(await recoveryModule.getAddress(), recoverableOwnersData, 1n);
+
+      await expect(tx).to.emit(account, "RecoverableOwners").withArgs([FIRST.address, THIRD.address]);
+
+      let recoveryMethodIdsData = recoveryModule.interface.encodeFunctionData("getRecoveryMethodIds", [
+        await recoveryManager.getAddress(),
+      ]);
+
+      tx = await executeSafeTx(await recoveryModule.getAddress(), recoveryMethodIdsData, 1n);
+
+      await expect(tx).to.emit(account, "RecoveryMethodIds").withArgs([0, 1]);
+
+      recoverableOwnersData = recoveryModule.interface.encodeFunctionData("getRecoverableOwners", [
+        await newRecoveryManager.getAddress(),
+      ]);
+
+      tx = await executeSafeTx(await recoveryModule.getAddress(), recoverableOwnersData, 1n);
+
+      await expect(tx).to.emit(account, "RecoverableOwners").withArgs([SECOND.address]);
+
+      recoveryMethodIdsData = recoveryModule.interface.encodeFunctionData("getRecoveryMethodIds", [
+        await newRecoveryManager.getAddress(),
+      ]);
+
+      tx = await executeSafeTx(await recoveryModule.getAddress(), recoveryMethodIdsData, 1n);
+
+      await expect(tx).to.emit(account, "RecoveryMethodIds").withArgs([0]);
+    });
+
+    it("should get exception if try to add recovery provider with inconsistent recovery methods length", async () => {
+      const accountRecoveryData1 = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY1.address]);
+      const accountRecoveryData2 = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY2.address]);
+
+      const subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
+        [
+          [
+            await subscriptionManager.getAddress(),
+            await paymentToken.getAddress(),
+            basePaymentPeriod,
+            [
+              [0n, accountRecoveryData1],
+              [0n, accountRecoveryData2],
+            ],
+          ],
+        ],
+      );
+
+      const recoveryData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address[]", "bytes"],
+        [[FIRST.address, SECOND.address, THIRD.address], subscribeData],
+      );
+
+      const addProviderData = recoveryModule.interface.encodeFunctionData("addRecoveryProvider", [
+        await recoveryManager.getAddress(),
+        recoveryData,
+      ]);
+
+      await expect(executeSafeTx(await recoveryModule.getAddress(), addProviderData, 1n)).to.be.revertedWithCustomError(
+        recoveryModule,
+        "InvalidRecoveryMethodsLength",
+      );
+    });
+
+    it("should get exception if try to add recovery provider with invalid Safe owner", async () => {
+      const accountRecoveryData = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY1.address]);
+
+      const subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
+        [
+          [
+            await subscriptionManager.getAddress(),
+            await paymentToken.getAddress(),
+            basePaymentPeriod,
+            [[0n, accountRecoveryData]],
+          ],
+        ],
+      );
+
+      const recoveryData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address[]", "bytes"],
+        [[OWNER.address], subscribeData],
+      );
+
+      const addProviderData = recoveryModule.interface.encodeFunctionData("addRecoveryProvider", [
+        await recoveryManager.getAddress(),
+        recoveryData,
+      ]);
+
+      await expect(executeSafeTx(await recoveryModule.getAddress(), addProviderData, 1n))
+        .to.be.revertedWithCustomError(recoveryModule, "NotASafeOwner")
+        .withArgs(OWNER.address);
+    });
+
+    it("should get exception if try to add recovery provider without delegate call", async () => {
+      await expect(recoveryModule.addRecoveryProvider(recoveryManager, "0x")).to.be.revertedWithCustomError(
+        recoveryModule,
+        "NotADelegateCall",
+      );
+    });
+  });
+
+  describe("#removeRecoveryProvider", () => {
+    it("should remover recovery provider correctly", async () => {
+      const accountRecoveryData2 = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY2.address]);
+      const accountRecoveryData3 = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY3.address]);
+
+      const subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
+        [
+          [
+            await subscriptionManager.getAddress(),
+            await paymentToken.getAddress(),
+            basePaymentPeriod,
+            [
+              [0n, accountRecoveryData2],
+              [0n, accountRecoveryData3],
+            ],
+          ],
+        ],
+      );
+
+      const recoveryData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address[]", "bytes"],
+        [[SECOND.address, THIRD.address], subscribeData],
+      );
+
+      const addProviderData = recoveryModule.interface.encodeFunctionData("addRecoveryProvider", [
+        await recoveryManager.getAddress(),
+        recoveryData,
+      ]);
+
+      await executeSafeTx(await recoveryModule.getAddress(), addProviderData, 1n);
+
+      const removeProviderData = recoveryModule.interface.encodeFunctionData("removeRecoveryProvider", [
+        await recoveryManager.getAddress(),
+      ]);
+
+      let tx = await executeSafeTx(await recoveryModule.getAddress(), removeProviderData, 1n);
+
+      await expect(tx)
+        .to.emit(account, "RecoveryProviderRemoved")
+        .withArgs(await recoveryManager.getAddress());
+
+      const recoverableOwnersData = recoveryModule.interface.encodeFunctionData("getRecoverableOwners", [
+        await recoveryManager.getAddress(),
+      ]);
+
+      tx = await executeSafeTx(await recoveryModule.getAddress(), recoverableOwnersData, 1n);
+
+      await expect(tx).to.emit(account, "RecoverableOwners").withArgs([]);
+
+      const recoveryMethodIdsData = recoveryModule.interface.encodeFunctionData("getRecoveryMethodIds", [
+        await recoveryManager.getAddress(),
+      ]);
+
+      tx = await executeSafeTx(await recoveryModule.getAddress(), recoveryMethodIdsData, 1n);
+
+      await expect(tx).to.emit(account, "RecoveryMethodIds").withArgs([]);
+    });
+
+    it("should get exception if try to remover recovery provider without delegate call", async () => {
+      await expect(recoveryModule.removeRecoveryProvider(recoveryManager)).to.be.revertedWithCustomError(
+        recoveryModule,
+        "NotADelegateCall",
+      );
+    });
+  });
+
+  describe("#updateRecoveryProvider", () => {
+    it("should update recovery provider correctly", async () => {
+      const accountRecoveryData1 = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY1.address]);
+      const accountRecoveryData2 = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY2.address]);
+      const accountRecoveryData3 = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY3.address]);
+
+      let subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
+        [
+          [
+            await subscriptionManager.getAddress(),
+            await paymentToken.getAddress(),
+            basePaymentPeriod,
+            [
+              [0n, accountRecoveryData2],
+              [0n, accountRecoveryData3],
+            ],
+          ],
+        ],
+      );
+
+      let recoveryData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address[]", "bytes"],
+        [[SECOND.address, THIRD.address], subscribeData],
+      );
+
+      const addProviderData = recoveryModule.interface.encodeFunctionData("addRecoveryProvider", [
+        await recoveryManager.getAddress(),
+        recoveryData,
+      ]);
+
+      let tx = await executeSafeTx(await recoveryModule.getAddress(), addProviderData, 1n);
+
+      await expect(tx)
+        .to.emit(account, "RecoveryProviderAdded")
+        .withArgs(await recoveryManager.getAddress());
+
+      subscribeData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["tuple(address,address,uint64,tuple(uint256,bytes)[])"],
+        [
+          [
+            await subscriptionManager.getAddress(),
+            ZeroAddress,
+            0n,
+            [
+              [0n, accountRecoveryData1],
+              [0n, accountRecoveryData2],
+              [0n, accountRecoveryData3],
+            ],
+          ],
+        ],
+      );
+
+      recoveryData = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address[]", "bytes"],
+        [[FIRST.address, SECOND.address, THIRD.address], subscribeData],
+      );
+
+      const updateProviderData = recoveryModule.interface.encodeFunctionData("updateRecoveryProvider", [
+        await recoveryManager.getAddress(),
+        recoveryData,
+      ]);
+
+      tx = await executeSafeTx(await recoveryModule.getAddress(), updateProviderData, 1n);
+
+      await expect(tx)
+        .to.emit(account, "RecoveryProviderRemoved")
+        .withArgs(await recoveryManager.getAddress());
+
+      await expect(tx)
+        .to.emit(account, "RecoveryProviderAdded")
+        .withArgs(await recoveryManager.getAddress());
+
+      let recoverableOwnersData = recoveryModule.interface.encodeFunctionData("getRecoverableOwners", [
+        await recoveryManager.getAddress(),
+      ]);
+
+      tx = await executeSafeTx(await recoveryModule.getAddress(), recoverableOwnersData, 1n);
+
+      await expect(tx).to.emit(account, "RecoverableOwners").withArgs([FIRST.address, SECOND.address, THIRD.address]);
+
+      let recoveryMethodIdsData = recoveryModule.interface.encodeFunctionData("getRecoveryMethodIds", [
+        await recoveryManager.getAddress(),
+      ]);
+
+      tx = await executeSafeTx(await recoveryModule.getAddress(), recoveryMethodIdsData, 1n);
+
+      await expect(tx).to.emit(account, "RecoveryMethodIds").withArgs([0, 1, 2]);
+    });
+
+    it("should get exception if try to update recovery provider without delegate call", async () => {
+      await expect(recoveryModule.updateRecoveryProvider(recoveryManager, "0x")).to.be.revertedWithCustomError(
+        recoveryModule,
+        "NotADelegateCall",
+      );
+    });
+  });
+
+  describe("recoverAccess", () => {
+    beforeEach(async () => {
       const accountRecoveryData1 = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY1.address]);
       const accountRecoveryData2 = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY2.address]);
       const accountRecoveryData3 = ethers.AbiCoder.defaultAbiCoder().encode(["address"], [MASTER_KEY3.address]);
@@ -244,12 +580,10 @@ describe("UnforgettableRecoveryModule", () => {
         recoveryData,
       ]);
 
-      let tx = await executeSafeTx(await recoveryModule.getAddress(), addProviderData, 1n);
+      await executeSafeTx(await recoveryModule.getAddress(), addProviderData, 1n);
+    });
 
-      await expect(tx)
-        .to.emit(account, "RecoveryProviderAdded")
-        .withArgs(await recoveryManager.getAddress());
-
+    it("should swap owner correctly", async () => {
       let object = ethers.AbiCoder.defaultAbiCoder().encode(
         ["address", "address", "address", "address"],
         [await account.getAddress(), FIRST.address, SECOND.address, OWNER.address],
@@ -268,7 +602,7 @@ describe("UnforgettableRecoveryModule", () => {
 
       expect(await account.getOwners()).to.be.deep.eq([FIRST.address, SECOND.address, THIRD.address]);
 
-      tx = await recoveryModule.connect(THIRD).recoverAccess(object, recoveryManager, recoveryProof);
+      const tx = await recoveryModule.connect(THIRD).recoverAccess(object, recoveryManager, recoveryProof);
 
       await expect(tx).to.emit(recoveryModule, "AccessRecovered").withArgs(object);
 
@@ -292,9 +626,93 @@ describe("UnforgettableRecoveryModule", () => {
 
       await expect(
         recoveryModule.connect(FIRST).recoverAccess(object, recoveryManager, recoveryProof),
-      ).to.be.revertedWithCustomError(recoveryModule, "RecoverCallFailed");
+      ).to.be.revertedWithCustomError(recoveryModule, "RecoveryValidationFailed");
 
       expect(await account.getOwners()).to.be.deep.eq([FIRST.address, OWNER.address, THIRD.address]);
+    });
+
+    it("should get exception if pass incorrect swapOwners parameters", async () => {
+      const object = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "address", "address", "address"],
+        [await account.getAddress(), SECOND.address, FIRST.address, OWNER.address],
+      );
+
+      const signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
+        account: await account.getAddress(),
+        object: object,
+        nonce: 0n,
+      });
+
+      const recoveryProof = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "bytes"],
+        [await subscriptionManager.getAddress(), signature],
+      );
+
+      await expect(
+        recoveryModule.connect(THIRD).recoverAccess(object, recoveryManager, recoveryProof),
+      ).to.be.revertedWithCustomError(recoveryModule, "SwapOwnerCallFailed");
+    });
+
+    it("should get exception if provide not registered provider to validateRecoveryFromAccount", async () => {
+      const object = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "address", "address", "address"],
+        [await account.getAddress(), FIRST.address, SECOND.address, OWNER.address],
+      );
+
+      const signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY2, {
+        account: await account.getAddress(),
+        object: object,
+        nonce: 0n,
+      });
+
+      const recoveryProof = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "bytes"],
+        [await subscriptionManager.getAddress(), signature],
+      );
+
+      const validateRecoveryData = recoveryModule.interface.encodeFunctionData("validateRecoveryFromAccount", [
+        object,
+        FIRST.address,
+        recoveryProof,
+      ]);
+
+      await expect(executeSafeTx(await recoveryModule.getAddress(), validateRecoveryData, 1n))
+        .to.be.revertedWithCustomError(recoveryModule, "ProviderNotRegistered")
+        .withArgs(FIRST.address);
+    });
+
+    it("should get exception if provide invalid old owner to validateRecoveryFromAccount", async () => {
+      const object = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "address", "address", "address"],
+        [await account.getAddress(), FIRST.address, OWNER.address, MASTER_KEY3.address],
+      );
+
+      const signature = await getRecoverAccountSignature(recoveryStrategy, MASTER_KEY1, {
+        account: await account.getAddress(),
+        object: object,
+        nonce: 0n,
+      });
+
+      const recoveryProof = ethers.AbiCoder.defaultAbiCoder().encode(
+        ["address", "bytes"],
+        [await subscriptionManager.getAddress(), signature],
+      );
+
+      const validateRecoveryData = recoveryModule.interface.encodeFunctionData("validateRecoveryFromAccount", [
+        object,
+        await recoveryManager.getAddress(),
+        recoveryProof,
+      ]);
+
+      await expect(executeSafeTx(await recoveryModule.getAddress(), validateRecoveryData, 1n))
+        .to.be.revertedWithCustomError(recoveryModule, "InvalidOldOwner")
+        .withArgs(OWNER.address);
+    });
+
+    it("should get exception if try to call validateRecoveryFromAccount without delegate call", async () => {
+      await expect(
+        recoveryModule.validateRecoveryFromAccount("0x", recoveryManager, "0x"),
+      ).to.be.revertedWithCustomError(recoveryModule, "NotADelegateCall");
     });
   });
 });

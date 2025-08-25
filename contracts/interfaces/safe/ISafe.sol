@@ -5,13 +5,13 @@ import {Enum} from "@safe-global/safe-smart-account/contracts/libraries/Enum.sol
 
 interface ISafe {
     function execTransactionFromModule(
-        address to,
-        uint256 value,
-        bytes memory data,
-        Enum.Operation operation
-    ) external returns (bool success);
+        address to_,
+        uint256 value_,
+        bytes memory data_,
+        Enum.Operation operation_
+    ) external returns (bool success_);
 
-    function swapOwner(address prevOwner, address oldOwner, address newOwner) external;
+    function swapOwner(address prevOwner_, address oldOwner_, address newOwner_) external;
 
-    function getOwners() external view returns (address[] memory);
+    function isOwner(address owner_) external view returns (bool);
 }

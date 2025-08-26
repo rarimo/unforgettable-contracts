@@ -50,4 +50,6 @@ interface IRecoveryManager is IRecoveryProvider {
     event StrategyAdded(uint256 indexed strategyId);
     event StrategyDisabled(uint256 indexed strategyId);
     event StrategyEnabled(uint256 indexed strategyId);
+
+    function subscriptionManagerExists(address subscriptionManager_) external view returns (bool);
 }

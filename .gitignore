@@ -14,3 +14,7 @@ generated-types
 
 # Hardhat migrate
 .storage.json
+
+# Foundry
+out/
+cache_forge/solidity-files-cache.json

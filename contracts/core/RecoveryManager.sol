@@ -137,7 +137,9 @@ contract RecoveryManager is IRecoveryManager, ADeployerGuard, OwnableUpgradeable
         }
     }
 
-    function subscriptionManagerExists(address subscriptionManager_) public view returns (bool) {
+    function subscriptionManagerExists(
+        address subscriptionManager_
+    ) public view override returns (bool) {
         return _getRecoveryManagerStorage().subscriptionManagers.contains(subscriptionManager_);
     }
 

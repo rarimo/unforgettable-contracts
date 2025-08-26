@@ -1,5 +1,6 @@
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomicfoundation/hardhat-ethers";
+import "@nomicfoundation/hardhat-foundry";
 import "@nomicfoundation/hardhat-verify";
 
 import "@solarity/hardhat-gobind";
@@ -35,7 +36,13 @@ const config: HardhatUserConfig = {
       gasMultiplier: 1.2,
     },
     sepolia: {
-      url: `https://sepolia.infura.io/v3/${process.env.INFURA_KEY}`,
+      url: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
+      accounts: privateKey(),
+      gasMultiplier: 1.2,
+    },
+    bsctestnet: {
+      url: `https://bnb-testnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
+      chainId: 97,
       accounts: privateKey(),
       gasMultiplier: 1.2,
     },
@@ -56,7 +63,11 @@ const config: HardhatUserConfig = {
     },
   },
   etherscan: {
-    apiKey: `${process.env.ETHERSCAN_KEY}`,
+    apiKey: {
+      ethereum: `${process.env.ETHERSCAN_KEY}`,
+      sepolia: `${process.env.ETHERSCAN_KEY}`,
+      bscTestnet: `${process.env.BSCSCAN_KEY}`,
+    },
   },
   migrate: {
     paths: {

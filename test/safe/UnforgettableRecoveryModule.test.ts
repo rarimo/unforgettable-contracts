@@ -604,7 +604,7 @@ describe("UnforgettableRecoveryModule", () => {
 
       const tx = await recoveryModule.connect(THIRD).recoverAccess(object, recoveryManager, recoveryProof);
 
-      await expect(tx).to.emit(recoveryModule, "AccessRecovered").withArgs(object);
+      await expect(tx).to.emit(account, "AccessRecovered").withArgs(object);
 
       expect(await account.getOwners()).to.be.deep.eq([FIRST.address, OWNER.address, THIRD.address]);
 

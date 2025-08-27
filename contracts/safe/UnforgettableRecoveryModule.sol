@@ -13,7 +13,8 @@ import {IRecoveryManager} from "../interfaces/core/IRecoveryManager.sol";
 /**
  * @notice The Unforgettable Safe Recovery module
  *
- * A Safe wallet module enabling ownership recovery via external recovery providers.
+ * A Safe wallet module enabling ownership recovery via external recovery providers that implement
+ * the IRecoveryManager interface.
  */
 contract UnforgettableRecoveryModule is AAccountRecovery {
     using EnumerableSet for EnumerableSet.AddressSet;
@@ -49,7 +50,7 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
     /**
      * @notice A function to add a new recovery provider and register recoverable owners.
      *
-     * @dev Must be executed via a delegate call.
+     * @dev Must be executed via the Safe wallet delegate call.
      *
      * @param provider_ the address of an IRecoveryManager provider to add.
      * @param recoveryData_ Encoded owners array and recovery manager subscription data.
@@ -64,7 +65,7 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
     /**
      * @notice A function to remove an existing recovery provider and clear associated owners.
      *
-     * @dev Must be executed via a delegate call.
+     * @dev Must be executed via the Safe wallet delegate call.
      *
      * @param provider_ the address of a previously added recovery provider to remove.
      */
@@ -75,7 +76,7 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
     /**
      * @notice A function to update an existing recovery provider configuration.
      *
-     * @dev Must be executed via a delegate call.
+     * @dev Must be executed via the Safe wallet delegate call.
      * @dev Removes the current provider and adds it with new settings.
      *
      * @param provider_ the address of the IRecoveryManager provider to update.
@@ -92,6 +93,10 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
 
     /**
      * @notice A function to recover account access by swapping an owner in the Safe wallet.
+     * @dev Under the hood, this invokes a Safe wallet delegate call to the module
+     *      `validateRecoveryFromAccount` function. After the successful validation, it
+     *      triggers a Safe module call to `swapOwner` via `execTransactionFromModule`,
+     *      replacing the old owner with the new one.
      * @param subject_ Encoded recovery subject (account_, prevOwner_, oldOwner_, newOwner_).
      * @param provider_ the address of a provider verifying the recovery.
      * @param proof_ an encoded proof of recovery.
@@ -118,14 +123,13 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
 
         require(success_, SwapOwnerCallFailed());
 
-        emit AccessRecovered(subject_);
-
         return true;
     }
 
     /**
      * @notice A function to validate a recovery request.
-     * @dev Must be executed via a delegate call.
+     * @dev Must be executed via the Safe wallet delegate call because the module
+     *      needs to read the recovery-related storage located in the Safe account.
      * @param object_ Encoded recovery object (account_, prevOwner_, oldOwner_, newOwner_).
      * @param provider_ the address of a provider verifying the recovery.
      * @param proof_ an encoded proof of recovery.
@@ -153,6 +157,8 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
         recoveryProof_ = abi.encode(subscriptionManager_, recoveryMethodId_, recoveryProof_);
 
         IRecoveryManager(provider_).recover(object_, recoveryProof_);
+
+        emit AccessRecovered(object_);
     }
 
     /**

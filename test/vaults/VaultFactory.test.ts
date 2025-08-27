@@ -123,6 +123,19 @@ describe("VaultFactory", () => {
         "InvalidInitialization",
       );
     });
+
+    it("should get exception if not a deployer try to call init function", async () => {
+      const vaultFactoryProxy = await ethers.deployContract("ERC1967Proxy", [
+        await vaultFactoryImpl.getAddress(),
+        "0x",
+      ]);
+
+      const vaultFactory = await ethers.getContractAt("VaultFactory", await vaultFactoryProxy.getAddress());
+
+      await expect(vaultFactory.connect(FIRST).initialize(FIRST, SECOND))
+        .to.be.revertedWithCustomError(vaultFactory, "OnlyDeployer")
+        .withArgs(FIRST.address);
+    });
   });
 
   describe("#upgrade", () => {

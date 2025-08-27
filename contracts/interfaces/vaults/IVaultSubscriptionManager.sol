@@ -17,6 +17,7 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
         TokensPaymentModuleInitData tokensPaymentInitData;
         SBTPaymentModuleInitData sbtPaymentInitData;
         SigSubscriptionModuleInitData sigSubscriptionInitData;
+        CrossChainModuleInitData crossChainInitData;
     }
 
     error NotAVault(address vaultAddr);

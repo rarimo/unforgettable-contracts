@@ -76,7 +76,8 @@ contract VaultSubscriptionManager is
             initData_.subscriptionCreators,
             initData_.tokensPaymentInitData,
             initData_.sbtPaymentInitData,
-            initData_.sigSubscriptionInitData
+            initData_.sigSubscriptionInitData,
+            initData_.crossChainInitData
         );
 
         _setVaultFactory(initData_.vaultFactoryAddr);

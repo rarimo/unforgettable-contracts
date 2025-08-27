@@ -9,6 +9,7 @@ interface IAccountSubscriptionManager is ISubscriptionManager {
         TokensPaymentModuleInitData tokensPaymentInitData;
         SBTPaymentModuleInitData sbtPaymentInitData;
         SigSubscriptionModuleInitData sigSubscriptionInitData;
+        CrossChainModuleInitData crossChainInitData;
     }
 
     function addSubscriptionCreators(address[] calldata subscriptionCreators_) external;

@@ -4,11 +4,13 @@ pragma solidity ^0.8.28;
 import {ITokensPaymentModule} from "./subscription/ITokensPaymentModule.sol";
 import {ISBTPaymentModule} from "./subscription/ISBTPaymentModule.sol";
 import {ISignatureSubscriptionModule} from "./subscription/ISignatureSubscriptionModule.sol";
+import {ICrossChainModule} from "./subscription/ICrossChainModule.sol";
 
 interface ISubscriptionManager is
     ITokensPaymentModule,
     ISBTPaymentModule,
-    ISignatureSubscriptionModule
+    ISignatureSubscriptionModule,
+    ICrossChainModule
 {
     error NotARecoveryManager(address sender);
     error NotASubscriptionCreator(address sender);

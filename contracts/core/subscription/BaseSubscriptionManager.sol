@@ -16,12 +16,14 @@ import {ISignatureSubscriptionModule} from "../../interfaces/core/subscription/I
 import {SBTPaymentModule} from "./modules/SBTPaymentModule.sol";
 import {TokensPaymentModule} from "./modules/TokensPaymentModule.sol";
 import {SignatureSubscriptionModule} from "./modules/SignatureSubscriptionModule.sol";
+import {CrossChainModule} from "./modules/CrossChainModule.sol";
 
 abstract contract BaseSubscriptionManager is
     ISubscriptionManager,
     TokensPaymentModule,
     SBTPaymentModule,
     SignatureSubscriptionModule,
+    CrossChainModule,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,
@@ -62,7 +64,8 @@ abstract contract BaseSubscriptionManager is
         address[] calldata subscriptionCreators_,
         TokensPaymentModuleInitData calldata tokensPaymentInitData_,
         SBTPaymentModuleInitData calldata sbtPaymentInitData_,
-        SigSubscriptionModuleInitData calldata sigSubscriptionInitData_
+        SigSubscriptionModuleInitData calldata sigSubscriptionInitData_,
+        CrossChainModuleInitData calldata crossChainInitData_
     ) public onlyInitializing {
         __Ownable_init(msg.sender);
         __ReentrancyGuard_init();
@@ -74,6 +77,7 @@ abstract contract BaseSubscriptionManager is
         __TokensPaymentModule_init(tokensPaymentInitData_);
         __SBTPaymentModule_init(sbtPaymentInitData_);
         __SignatureSubscriptionModule_init(sigSubscriptionInitData_);
+        __CrossChainModule_init(crossChainInitData_);
     }
 
     function pause() public virtual onlyOwner {

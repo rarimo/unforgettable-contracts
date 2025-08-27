@@ -54,7 +54,7 @@ contract SBTPaymentModule is ISBTPaymentModule, BaseSubscriptionModule, Initiali
         address sbt_,
         uint256 tokenId_
     ) public virtual onlySupportedSBT(sbt_) {
-        _buySubscriptionWithSBT(account_, sbt_, tokenId_);
+        _buySubscriptionWithSBT(account_, sbt_, msg.sender, tokenId_);
     }
 
     function getSupportedSBTs() public view returns (address[] memory) {
@@ -110,13 +110,14 @@ contract SBTPaymentModule is ISBTPaymentModule, BaseSubscriptionModule, Initiali
     function _buySubscriptionWithSBT(
         address account_,
         address sbt_,
+        address sbtOwner_,
         uint256 tokenId_
     ) internal virtual {
-        _processSBTPayment(msg.sender, sbt_, tokenId_);
+        _processSBTPayment(sbtOwner_, sbt_, tokenId_);
 
         _extendSubscription(account_, getSubscriptionDurationPerSBT(sbt_));
 
-        emit SubscriptionBoughtWithSBT(sbt_, msg.sender, tokenId_);
+        emit SubscriptionBoughtWithSBT(sbt_, sbtOwner_, tokenId_);
     }
 
     function _processSBTPayment(

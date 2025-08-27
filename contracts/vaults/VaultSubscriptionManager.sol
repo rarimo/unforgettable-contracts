@@ -119,12 +119,30 @@ contract VaultSubscriptionManager is
         super.buySubscriptionWithSBT(vault_, sbt_, tokenId_);
     }
 
+    function buySubscriptionWithSBT(
+        address vault_,
+        address sbt_,
+        address sbtOwner_,
+        uint256 tokenId_
+    ) public onlySupportedSBT(sbt_) onlyVault(vault_) onlyVaultFactory nonReentrant {
+        _buySubscriptionWithSBT(vault_, sbt_, sbtOwner_, tokenId_);
+    }
+
     function buySubscriptionWithSignature(
         address vault_,
         uint64 duration_,
         bytes memory signature_
     ) public override(BaseSubscriptionManager, ISignatureSubscriptionModule) onlyVault(vault_) {
         super.buySubscriptionWithSignature(vault_, duration_, signature_);
+    }
+
+    function buySubscriptionWithSignature(
+        address sender_,
+        address vault_,
+        uint64 duration_,
+        bytes memory signature_
+    ) public onlyVault(vault_) onlyVaultFactory nonReentrant {
+        _buySubscriptionWithSignature(sender_, vault_, duration_, signature_);
     }
 
     function updateVaultName(

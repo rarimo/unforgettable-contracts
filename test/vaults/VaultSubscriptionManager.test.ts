@@ -368,6 +368,98 @@ describe("VaultSubscriptionManager", () => {
     });
   });
 
+  describe("#buySubscriptionWithSBT(with sbtOwner)", () => {
+    const tokenId = 1n;
+
+    beforeEach("setup", async () => {
+      await vaultFactory.setDeployedVault(FIRST, true);
+
+      await sbt.mint(FIRST, tokenId);
+    });
+
+    it("should correctly buy subscription with SBT token", async () => {
+      const startTime = (await time.latest()) + 100;
+      const expectedEndTime = BigInt(startTime) + sbtSubscriptionDuration;
+
+      await time.setNextBlockTimestamp(startTime);
+      const tx = await vaultFactory.callBuySubscriptionWithSBT(subscriptionManager, FIRST, sbt, FIRST, tokenId);
+
+      await expect(tx)
+        .to.emit(subscriptionManager, "SubscriptionBoughtWithSBT")
+        .withArgs(await sbt.getAddress(), FIRST.address, tokenId);
+      await expect(tx)
+        .to.emit(subscriptionManager, "SubscriptionExtended")
+        .withArgs(FIRST.address, sbtSubscriptionDuration, expectedEndTime);
+
+      expect(await subscriptionManager.hasActiveSubscription(FIRST)).to.be.true;
+      expect(await subscriptionManager.getSubscriptionEndTime(FIRST)).to.be.eq(expectedEndTime);
+
+      await expect(sbt.ownerOf(tokenId)).to.be.revertedWithCustomError(sbt, "ERC721NonexistentToken").withArgs(tokenId);
+    });
+
+    it("should get exception if pass not a vault address", async () => {
+      await expect(vaultFactory.callBuySubscriptionWithSBT(subscriptionManager, SECOND, sbt, FIRST, tokenId))
+        .to.be.revertedWithCustomError(subscriptionManager, "NotAVault")
+        .withArgs(SECOND.address);
+    });
+
+    it("should get exception if pass unsupported sbt address", async () => {
+      await expect(vaultFactory.callBuySubscriptionWithSBT(subscriptionManager, FIRST, FIRST, FIRST, tokenId))
+        .to.be.revertedWithCustomError(subscriptionManager, "NotSupportedSBT")
+        .withArgs(FIRST.address);
+    });
+
+    it("should get exception if the caller is not the vault factory", async () => {
+      const newVaultFactory = await ethers.deployContract("VaultFactoryMock");
+
+      await newVaultFactory.setDeployedVault(FIRST, true);
+
+      const subscriptionManagerImpl = await ethers.deployContract("VaultSubscriptionManagerMock");
+
+      const subscriptionManagerProxy = await ethers.deployContract("ERC1967Proxy", [
+        await subscriptionManagerImpl.getAddress(),
+        "0x",
+      ]);
+      const subscriptionManager = await ethers.getContractAt(
+        "VaultSubscriptionManagerMock",
+        await subscriptionManagerProxy.getAddress(),
+      );
+
+      await subscriptionManager.initialize({
+        subscriptionCreators: [],
+        vaultFactoryAddr: await newVaultFactory.getAddress(),
+        vaultNameRetentionPeriod: vaultNameRetentionPeriod,
+        vaultPaymentTokenEntries: [],
+        tokensPaymentInitData: {
+          basePaymentPeriod: basePaymentPeriod,
+          durationFactorEntries: [],
+          paymentTokenEntries: [],
+        },
+        sbtPaymentInitData: {
+          sbtEntries: [
+            {
+              sbt: await sbt.getAddress(),
+              subscriptionDurationPerToken: sbtSubscriptionDuration,
+            },
+          ],
+        },
+        sigSubscriptionInitData: {
+          subscriptionSigner: SUBSCRIPTION_SIGNER,
+        },
+      });
+
+      await expect(vaultFactory.callBuySubscriptionWithSBT(subscriptionManager, FIRST, sbt, FIRST, tokenId))
+        .to.be.revertedWithCustomError(subscriptionManager, "NotAVaultFactory")
+        .withArgs(await vaultFactory.getAddress());
+    });
+
+    it("should get exception if the passed owner is not the sbt owner", async () => {
+      await expect(vaultFactory.callBuySubscriptionWithSBT(subscriptionManager, FIRST, sbt, SECOND, tokenId))
+        .to.be.revertedWithCustomError(subscriptionManager, "NotASBTOwner")
+        .withArgs(await sbt.getAddress(), SECOND.address, tokenId);
+    });
+  });
+
   describe("#buySubscriptionWithSignature", () => {
     it("should correctly buy subscription with signature", async () => {
       await vaultFactory.setDeployedVault(FIRST, true);
@@ -408,6 +500,125 @@ describe("VaultSubscriptionManager", () => {
       await expect(subscriptionManager.buySubscriptionWithSignature(FIRST, basePaymentPeriod * 12n, signature))
         .to.be.revertedWithCustomError(subscriptionManager, "NotAVault")
         .withArgs(FIRST.address);
+    });
+  });
+
+  describe("#buySubscriptionWithSignature(with sender)", () => {
+    it("should correctly buy subscription with signature", async () => {
+      await vaultFactory.setDeployedVault(FIRST, true);
+
+      const duration = basePaymentPeriod * 12n;
+
+      const currentNonce = await subscriptionManager.nonces(OWNER);
+      const signature = await getBuySubscriptionSignature(subscriptionManager, SUBSCRIPTION_SIGNER, {
+        sender: OWNER.address,
+        duration: duration,
+        nonce: currentNonce,
+      });
+
+      const startTime = (await time.latest()) + 100;
+      const expectedEndTime = BigInt(startTime) + duration;
+
+      await time.setNextBlockTimestamp(startTime);
+      const tx = await vaultFactory.callBuySubscriptionWithSignature(
+        subscriptionManager,
+        OWNER,
+        FIRST,
+        duration,
+        signature,
+      );
+
+      expect(await subscriptionManager.nonces(OWNER)).to.be.eq(currentNonce + 1n);
+
+      await expect(tx)
+        .to.emit(subscriptionManager, "SubscriptionBoughtWithSignature")
+        .withArgs(OWNER.address, duration, currentNonce);
+      await expect(tx)
+        .to.emit(subscriptionManager, "SubscriptionExtended")
+        .withArgs(FIRST.address, duration, expectedEndTime);
+    });
+
+    it("should get exception if pass not a vault address", async () => {
+      const currentNonce = await subscriptionManager.nonces(FIRST);
+      const signature = await getBuySubscriptionSignature(subscriptionManager, FIRST, {
+        sender: FIRST.address,
+        duration: basePaymentPeriod * 12n,
+        nonce: currentNonce,
+      });
+
+      await expect(
+        vaultFactory.callBuySubscriptionWithSignature(
+          subscriptionManager,
+          OWNER,
+          FIRST,
+          basePaymentPeriod * 12n,
+          signature,
+        ),
+      )
+        .to.be.revertedWithCustomError(subscriptionManager, "NotAVault")
+        .withArgs(FIRST.address);
+    });
+
+    it("should get exception if the caller is not the vault factory", async () => {
+      const newVaultFactory = await ethers.deployContract("VaultFactoryMock");
+
+      await newVaultFactory.setDeployedVault(OWNER, true);
+
+      const subscriptionManagerImpl = await ethers.deployContract("VaultSubscriptionManagerMock");
+
+      const subscriptionManagerProxy = await ethers.deployContract("ERC1967Proxy", [
+        await subscriptionManagerImpl.getAddress(),
+        "0x",
+      ]);
+      const subscriptionManager = await ethers.getContractAt(
+        "VaultSubscriptionManagerMock",
+        await subscriptionManagerProxy.getAddress(),
+      );
+
+      await subscriptionManager.initialize({
+        subscriptionCreators: [],
+        vaultFactoryAddr: await newVaultFactory.getAddress(),
+        vaultNameRetentionPeriod: vaultNameRetentionPeriod,
+        vaultPaymentTokenEntries: [],
+        tokensPaymentInitData: {
+          basePaymentPeriod: basePaymentPeriod,
+          durationFactorEntries: [],
+          paymentTokenEntries: [],
+        },
+        sbtPaymentInitData: {
+          sbtEntries: [
+            {
+              sbt: await sbt.getAddress(),
+              subscriptionDurationPerToken: sbtSubscriptionDuration,
+            },
+          ],
+        },
+        sigSubscriptionInitData: {
+          subscriptionSigner: SUBSCRIPTION_SIGNER,
+        },
+      });
+
+      await expect(
+        vaultFactory.callBuySubscriptionWithSignature(subscriptionManager, OWNER, OWNER, basePaymentPeriod * 12n, "0x"),
+      )
+        .to.be.revertedWithCustomError(subscriptionManager, "NotAVaultFactory")
+        .withArgs(await vaultFactory.getAddress());
+    });
+
+    it("should get exception if try to pass invalid sender", async () => {
+      await vaultFactory.setDeployedVault(FIRST, true);
+
+      const duration = basePaymentPeriod * 12n;
+
+      const signature = await getBuySubscriptionSignature(subscriptionManager, SUBSCRIPTION_SIGNER, {
+        sender: OWNER.address,
+        duration: duration,
+        nonce: await subscriptionManager.nonces(OWNER),
+      });
+
+      await expect(
+        vaultFactory.callBuySubscriptionWithSignature(subscriptionManager, FIRST, FIRST, duration, signature),
+      ).to.be.revertedWithCustomError(subscriptionManager, "InvalidSignature");
     });
   });
 

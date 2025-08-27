@@ -20,7 +20,7 @@ interface ISBTPaymentModule is IBaseSubscriptionModule {
     event SBTAdded(address indexed sbt);
     event SBTRemoved(address indexed sbt);
     event SubscriptionDurationPerSBTUpdated(address indexed sbt, uint64 newDuration);
-    event SubscriptionBoughtWithSBT(address indexed sbt, address indexed sender, uint256 tokenId);
+    event SubscriptionBoughtWithSBT(address indexed sbt, address indexed payer, uint256 tokenId);
 
     function buySubscriptionWithSBT(address account_, address sbt_, uint256 tokenId_) external;
 

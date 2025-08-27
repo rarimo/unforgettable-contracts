@@ -1,6 +1,6 @@
-import { ERC20Mock, Vault, VaultFactory, VaultSubscriptionManager } from "@ethers-v6";
+import { ERC20Mock, SBTMock, Vault, VaultFactory, VaultSubscriptionManager } from "@ethers-v6";
 import { ETHER_ADDR, wei } from "@scripts";
-import { Reverter } from "@test-helpers";
+import { Reverter, getBuySubscriptionSignature } from "@test-helpers";
 
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
@@ -29,10 +29,14 @@ describe("VaultFactory", () => {
 
   let paymentToken: ERC20Mock;
 
+  let sbt: SBTMock;
+
   before(async () => {
     [OWNER, SUBSCRIPTION_SIGNER, FIRST, SECOND, MASTER_KEY1] = await ethers.getSigners();
 
     paymentToken = await ethers.deployContract("ERC20Mock", ["Test Token", "TT", 18]);
+
+    sbt = await ethers.deployContract("SBTMock");
 
     vaultImpl = await ethers.deployContract("Vault");
     vaultFactoryImpl = await ethers.deployContract("VaultFactory");
@@ -50,6 +54,8 @@ describe("VaultFactory", () => {
       "VaultSubscriptionManager",
       await subscriptionManagerProxy.getAddress(),
     );
+
+    await sbt.initialize("TestSBT", "TSBT", [subscriptionManager]);
 
     await vaultFactory.initialize(vaultImpl, subscriptionManager);
     await subscriptionManager.initialize({
@@ -81,7 +87,12 @@ describe("VaultFactory", () => {
         ],
       },
       sbtPaymentInitData: {
-        sbtEntries: [],
+        sbtEntries: [
+          {
+            sbt: sbt,
+            subscriptionDurationPerToken: basePaymentPeriod,
+          },
+        ],
       },
       sigSubscriptionInitData: {
         subscriptionSigner: SUBSCRIPTION_SIGNER,
@@ -111,6 +122,19 @@ describe("VaultFactory", () => {
         vaultFactory,
         "InvalidInitialization",
       );
+    });
+
+    it("should get exception if not a deployer try to call init function", async () => {
+      const vaultFactoryProxy = await ethers.deployContract("ERC1967Proxy", [
+        await vaultFactoryImpl.getAddress(),
+        "0x",
+      ]);
+
+      const vaultFactory = await ethers.getContractAt("VaultFactory", await vaultFactoryProxy.getAddress());
+
+      await expect(vaultFactory.connect(FIRST).initialize(FIRST, SECOND))
+        .to.be.revertedWithCustomError(vaultFactory, "OnlyDeployer")
+        .withArgs(FIRST.address);
     });
   });
 
@@ -270,6 +294,64 @@ describe("VaultFactory", () => {
       await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(expectedVaultAddr, "1234");
 
       await expect(tx).to.changeEtherBalances([FIRST, subscriptionManager], [-expectedTotalCost, expectedTotalCost]);
+    });
+
+    it("should correctly deploy new vault and buy subscription with signature", async () => {
+      const masterKeyNonce = await vaultFactory.nonces(MASTER_KEY1);
+      const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, MASTER_KEY1, masterKeyNonce);
+
+      const expectedVaultNameCost = await subscriptionManager.getVaultNameCost(paymentToken, "1234");
+
+      await paymentToken.connect(SECOND).approve(vaultFactory, expectedVaultNameCost);
+
+      const sig = await getBuySubscriptionSignature(subscriptionManager, SUBSCRIPTION_SIGNER, {
+        sender: SECOND.address,
+        duration: initialSubscriptionDuration,
+        nonce: await subscriptionManager.nonces(SECOND),
+      });
+
+      const tx = await vaultFactory
+        .connect(SECOND)
+        .deployVaultWithSignature(MASTER_KEY1, paymentToken, initialSubscriptionDuration, sig, "1234", {
+          value: expectedVaultNameCost,
+        });
+
+      await expect(tx)
+        .to.emit(vaultFactory, "VaultDeployed")
+        .withArgs(SECOND.address, expectedVaultAddr, MASTER_KEY1.address);
+
+      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(expectedVaultAddr, "1234");
+
+      await expect(tx).to.changeTokenBalances(
+        paymentToken,
+        [SECOND, subscriptionManager],
+        [-expectedVaultNameCost, expectedVaultNameCost],
+      );
+    });
+
+    it("should correctly deploy new vault and buy subscription with sbt", async () => {
+      const tokenId = 123;
+      await sbt.mint(SECOND, tokenId);
+
+      const masterKeyNonce = await vaultFactory.nonces(MASTER_KEY1);
+      const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, MASTER_KEY1, masterKeyNonce);
+
+      const expectedVaultNameCost = await subscriptionManager.getVaultNameCost(ETHER_ADDR, "12345");
+
+      const tx = await vaultFactory
+        .connect(SECOND)
+        .deployVaultWithSBT(MASTER_KEY1, ETHER_ADDR, sbt, tokenId, "12345", { value: expectedVaultNameCost });
+
+      await expect(tx)
+        .to.emit(vaultFactory, "VaultDeployed")
+        .withArgs(SECOND.address, expectedVaultAddr, MASTER_KEY1.address);
+
+      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(expectedVaultAddr, "12345");
+
+      await expect(tx).to.changeEtherBalances(
+        [SECOND, subscriptionManager],
+        [-expectedVaultNameCost, expectedVaultNameCost],
+      );
     });
   });
 });

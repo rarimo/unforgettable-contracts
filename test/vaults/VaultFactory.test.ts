@@ -353,5 +353,29 @@ describe("VaultFactory", () => {
         [-expectedVaultNameCost, expectedVaultNameCost],
       );
     });
+
+    it("should correctly deploy new vault without tokens with sbt", async () => {
+      const tokenId = 123;
+      await sbt.mint(SECOND, tokenId);
+
+      const masterKeyNonce = await vaultFactory.nonces(MASTER_KEY1);
+      const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, MASTER_KEY1, masterKeyNonce);
+
+      const expectedVaultNameCost = await subscriptionManager.getVaultNameCost(ETHER_ADDR, "12345678");
+
+      expect(expectedVaultNameCost).to.be.eq(0n);
+
+      const tx = await vaultFactory
+        .connect(SECOND)
+        .deployVaultWithSBT(MASTER_KEY1, ETHER_ADDR, sbt, tokenId, "12345678");
+
+      await expect(tx)
+        .to.emit(vaultFactory, "VaultDeployed")
+        .withArgs(SECOND.address, expectedVaultAddr, MASTER_KEY1.address);
+
+      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(expectedVaultAddr, "12345678");
+
+      await expect(tx).to.changeEtherBalances([SECOND, subscriptionManager], [0n, 0n]);
+    });
   });
 });

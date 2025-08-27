@@ -264,7 +264,10 @@ contract VaultSubscriptionManager is
         _validateVaultName(vaultName_, vault_);
 
         uint256 vaultNameCost_ = getVaultNameCost(token_, vaultName_);
-        token_.receiveTokens(payer_, vaultNameCost_);
+
+        if (vaultNameCost_ > 0) {
+            token_.receiveTokens(payer_, vaultNameCost_);
+        }
 
         VaultSubscriptionManagerStorage storage $ = _getVaultSubscriptionManagerStorage();
 
@@ -312,6 +315,9 @@ contract VaultSubscriptionManager is
     ) internal pure returns (uint256) {
         uint256 nameLength_ = bytes(vaultName_).length;
 
+        if (nameLength_ >= 8) {
+            return 0;
+        }
         if (nameLength_ >= 5) {
             return PERCENTAGE_100;
         }

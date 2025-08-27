@@ -346,7 +346,9 @@ describe("VaultSubscriptionManager", () => {
       const expectedEndTime = BigInt(startTime) + sbtSubscriptionDuration;
 
       await time.setNextBlockTimestamp(startTime);
-      const tx = await subscriptionManager.connect(FIRST).buySubscriptionWithSBT(FIRST, sbt, tokenId);
+      const tx = await subscriptionManager
+        .connect(FIRST)
+        ["buySubscriptionWithSBT(address,address,uint256)"](FIRST, sbt, tokenId);
 
       await expect(tx)
         .to.emit(subscriptionManager, "SubscriptionBoughtWithSBT")
@@ -362,7 +364,7 @@ describe("VaultSubscriptionManager", () => {
     });
 
     it("should get exception if pass not a vault address", async () => {
-      await expect(subscriptionManager.buySubscriptionWithSBT(FIRST, sbt, tokenId))
+      await expect(subscriptionManager["buySubscriptionWithSBT(address,address,uint256)"](FIRST, sbt, tokenId))
         .to.be.revertedWithCustomError(subscriptionManager, "NotAVault")
         .withArgs(FIRST.address);
     });
@@ -477,7 +479,11 @@ describe("VaultSubscriptionManager", () => {
       const expectedEndTime = BigInt(startTime) + duration;
 
       await time.setNextBlockTimestamp(startTime);
-      const tx = await subscriptionManager.buySubscriptionWithSignature(FIRST, duration, signature);
+      const tx = await subscriptionManager["buySubscriptionWithSignature(address,uint64,bytes)"](
+        FIRST,
+        duration,
+        signature,
+      );
 
       expect(await subscriptionManager.nonces(OWNER)).to.be.eq(currentNonce + 1n);
 
@@ -497,7 +503,13 @@ describe("VaultSubscriptionManager", () => {
         nonce: currentNonce,
       });
 
-      await expect(subscriptionManager.buySubscriptionWithSignature(FIRST, basePaymentPeriod * 12n, signature))
+      await expect(
+        subscriptionManager["buySubscriptionWithSignature(address,uint64,bytes)"](
+          FIRST,
+          basePaymentPeriod * 12n,
+          signature,
+        ),
+      )
         .to.be.revertedWithCustomError(subscriptionManager, "NotAVault")
         .withArgs(FIRST.address);
     });
@@ -766,6 +778,31 @@ describe("VaultSubscriptionManager", () => {
 
       expect(await subscriptionManager.getVaultByName("abcd")).to.be.eq(vaultAddress2);
       expect(await subscriptionManager.getVaultName(vaultAddress2)).to.be.eq("abcd");
+    });
+
+    it("should correctly update the vault name without payment", async () => {
+      const tokenId = 1n;
+      await sbt.mint(FIRST, tokenId);
+
+      await subscriptionManager
+        .connect(FIRST)
+        ["buySubscriptionWithSBT(address,address,uint256)"](vaultAddress1.toString(), sbt, tokenId);
+
+      const vaultName = "TheBestVaultName";
+      const signature = await getUpdateVaultNameSignature(subscriptionManager, OWNER, {
+        account: vaultAddress1.toString(),
+        vaultName: vaultName,
+        nonce: 0n,
+      });
+
+      const tx = await updateVaultName(vaultAddress1, paymentToken, vaultName, signature);
+
+      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(vaultAddress1, vaultName);
+
+      expect(await subscriptionManager.getVaultByName(vaultName)).to.be.eq(vaultAddress1);
+      expect(await subscriptionManager.getVaultName(vaultAddress1)).to.be.eq(vaultName);
+
+      await expect(tx).to.changeTokenBalances(paymentToken, [OWNER, subscriptionManager], [0n, 0n]);
     });
 
     it("should get exception if the signer is not the vault owner", async () => {

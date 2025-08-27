@@ -42,6 +42,20 @@ interface IVaultSubscriptionManager is ISubscriptionManager {
         VaultPaymentTokenUpdateEntry[] calldata vaultPaymentTokenEntries_
     ) external;
 
+    function buySubscriptionWithSBT(
+        address vault_,
+        address sbt_,
+        address sbtOwner_,
+        uint256 tokenId_
+    ) external;
+
+    function buySubscriptionWithSignature(
+        address sender_,
+        address vault_,
+        uint64 duration_,
+        bytes memory signature_
+    ) external;
+
     function updateVaultName(
         address vault_,
         address token_,

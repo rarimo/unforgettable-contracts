@@ -1,12 +1,13 @@
 import {
   BuySubscriptionTypes,
   RecoverAccountTypes,
+  SafeTransactionTypes,
   UpdateVaultNameTypes,
   VaultUpdateEnabledStatusTypes,
   VaultUpdateMasterKeyTypes,
   VaultWithdrawTokensTypes,
 } from "@/test/helpers/eip712types";
-import { EIP712Upgradeable, SignatureRecoveryStrategy, Vault, VaultSubscriptionManager } from "@ethers-v6";
+import { EIP712Upgradeable, SafeMock, SignatureRecoveryStrategy, Vault, VaultSubscriptionManager } from "@ethers-v6";
 
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
@@ -45,6 +46,19 @@ export interface UpdateVaultNameData {
 export interface RecoverAccountData {
   account: string;
   object: string;
+  nonce: bigint;
+}
+
+export interface SafeTransactionData {
+  to: string;
+  value: bigint;
+  data: string;
+  operation: bigint;
+  safeTxGas: bigint;
+  baseGas: bigint;
+  gasPrice: bigint;
+  gasToken: string;
+  refundReceiver: string;
   nonce: bigint;
 }
 
@@ -155,4 +169,17 @@ export async function getRecoverAccountSignature(
     objectHash: ethers.keccak256(data.object),
     nonce: data.nonce,
   });
+}
+
+export async function getSafeTransactionSignature(
+  safe: SafeMock,
+  account: SignerWithAddress,
+  data: SafeTransactionData,
+): Promise<string> {
+  const domain: TypedDataDomain = {
+    chainId: (await ethers.provider.getNetwork()).chainId,
+    verifyingContract: await safe.getAddress(),
+  };
+
+  return await account.signTypedData(domain, SafeTransactionTypes, data);
 }

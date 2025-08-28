@@ -57,7 +57,6 @@ interface IVaultFactory {
     function getVaultImplementation() external view returns (address);
 
     function predictVaultAddress(
-        address implementation_,
         address masterKey_,
         uint256 nonce_
     ) external view returns (address);

@@ -219,7 +219,7 @@ describe("VaultFactory", () => {
 
     it("should correctly deploy new vault and buy subscription with ERC20 tokens", async () => {
       const masterKeyNonce = await vaultFactory.nonces(MASTER_KEY1);
-      const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, MASTER_KEY1, masterKeyNonce);
+      const expectedVaultAddr = await vaultFactory.predictVaultAddress(MASTER_KEY1, masterKeyNonce);
 
       const expectedSubscriptionCost = await subscriptionManager.getSubscriptionCost(
         expectedVaultAddr,
@@ -260,7 +260,7 @@ describe("VaultFactory", () => {
 
     it("should correctly deploy new vault and buy subscription with native currency", async () => {
       const masterKeyNonce = await vaultFactory.nonces(MASTER_KEY1);
-      const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, MASTER_KEY1, masterKeyNonce);
+      const expectedVaultAddr = await vaultFactory.predictVaultAddress(MASTER_KEY1, masterKeyNonce);
 
       const expectedSubscriptionCost = await subscriptionManager.getSubscriptionCost(
         expectedVaultAddr,
@@ -286,7 +286,7 @@ describe("VaultFactory", () => {
 
     it("should correctly deploy new vault and buy subscription with signature", async () => {
       const masterKeyNonce = await vaultFactory.nonces(MASTER_KEY1);
-      const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, MASTER_KEY1, masterKeyNonce);
+      const expectedVaultAddr = await vaultFactory.predictVaultAddress(MASTER_KEY1, masterKeyNonce);
 
       const sig = await getBuySubscriptionSignature(subscriptionManager, SUBSCRIPTION_SIGNER, {
         sender: SECOND.address,
@@ -310,7 +310,7 @@ describe("VaultFactory", () => {
       await sbt.mint(SECOND, tokenId);
 
       const masterKeyNonce = await vaultFactory.nonces(MASTER_KEY1);
-      const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, MASTER_KEY1, masterKeyNonce);
+      const expectedVaultAddr = await vaultFactory.predictVaultAddress(MASTER_KEY1, masterKeyNonce);
 
       const tx = await vaultFactory.connect(SECOND).deployVaultWithSBT(MASTER_KEY1, sbt, tokenId, defaultVaultName);
 

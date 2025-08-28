@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -14,6 +13,8 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 
 import {Paginator} from "@solarity/solidity-lib/libs/arrays/Paginator.sol";
 import {ADeployerGuard} from "@solarity/solidity-lib/utils/ADeployerGuard.sol";
+
+import {CREATE3} from "solady/src/utils/CREATE3.sol";
 
 import {IVault} from "../interfaces/vaults/IVault.sol";
 import {IVaultFactory} from "../interfaces/vaults/IVaultFactory.sol";
@@ -182,11 +183,10 @@ contract VaultFactory is
     }
 
     function predictVaultAddress(
-        address implementation_,
         address masterKey_,
         uint256 nonce_
     ) external view returns (address) {
-        return _predictAddress(implementation_, getDeployVaultSalt(masterKey_, nonce_));
+        return CREATE3.predictDeterministicAddress(getDeployVaultSalt(masterKey_, nonce_));
     }
 
     function implementation() external view returns (address) {
@@ -233,7 +233,7 @@ contract VaultFactory is
 
         bytes32 salt_ = getDeployVaultSalt(masterKey_, _useNonce(masterKey_));
 
-        vaultAddr_ = _deploy2($.vaultImplementation, salt_);
+        vaultAddr_ = _deploy3($.vaultImplementation, salt_);
 
         IVault(vaultAddr_).initialize(masterKey_);
 
@@ -254,8 +254,8 @@ contract VaultFactory is
         $.namesToVaults[keccak256(bytes(vaultName_))] = vault_;
     }
 
-    function _deploy2(address implementation_, bytes32 salt_) internal returns (address) {
-        return payable(address(new ERC1967Proxy{salt: salt_}(implementation_, new bytes(0))));
+    function _deploy3(address implementation_, bytes32 salt_) internal returns (address) {
+        return CREATE3.deployDeterministic(_getVaultProxyCreationCode(implementation_), salt_);
     }
 
     /**
@@ -266,17 +266,13 @@ contract VaultFactory is
     // solhint-disable-next-line no-empty-blocks
     function _authorizeUpgrade(address newImplementation_) internal override onlyOwner {}
 
-    function _predictAddress(
-        address implementation_,
-        bytes32 salt_
-    ) internal view returns (address) {
-        bytes32 bytecodeHash_ = keccak256(
+    function _getVaultProxyCreationCode(
+        address implementation_
+    ) internal pure returns (bytes memory) {
+        return
             abi.encodePacked(
                 type(ERC1967Proxy).creationCode,
                 abi.encode(implementation_, new bytes(0))
-            )
-        );
-
-        return Create2.computeAddress(salt_, bytecodeHash_);
+            );
     }
 }

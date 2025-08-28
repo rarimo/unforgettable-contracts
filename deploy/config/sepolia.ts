@@ -19,7 +19,7 @@ export const deployConfig: DeployConfig = {
       paymentTokenEntries: [
         {
           paymentToken: ETHER_ADDR,
-          baseSubscriptionCost: wei(5, 14),
+          baseSubscriptionCost: wei(5, 11),
         },
         {
           paymentToken: "0xbb2e698669534eaBa3e276F17802723371178581",
@@ -55,7 +55,7 @@ export const deployConfig: DeployConfig = {
       paymentTokenEntries: [
         {
           paymentToken: ETHER_ADDR,
-          baseSubscriptionCost: wei(5, 14),
+          baseSubscriptionCost: wei(5, 11),
         },
         {
           paymentToken: "0xbb2e698669534eaBa3e276F17802723371178581",

@@ -40,7 +40,7 @@ contract Base7702AccountRecovery is AAccountRecovery {
         address provider_,
         bytes memory recoveryData_
     ) external payable override onlySelfOrTrustedExecutor {
-        _addRecoveryProvider(provider_, recoveryData_);
+        _addRecoveryProvider(provider_, recoveryData_, msg.value);
     }
 
     /**
@@ -49,7 +49,7 @@ contract Base7702AccountRecovery is AAccountRecovery {
     function removeRecoveryProvider(
         address provider_
     ) external payable override onlySelfOrTrustedExecutor {
-        _removeRecoveryProvider(provider_);
+        _removeRecoveryProvider(provider_, msg.value);
     }
 
     /**

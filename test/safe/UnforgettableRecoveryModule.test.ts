@@ -6,7 +6,6 @@ import {
   SafeMock,
   SignatureRecoveryStrategy,
   UnforgettableRecoveryModule,
-  UnforgettableRecoveryModuleMock,
 } from "@ethers-v6";
 import { wei } from "@scripts";
 import { Reverter } from "@test-helpers";
@@ -45,7 +44,7 @@ describe("UnforgettableRecoveryModule", () => {
 
   let accountImpl: SafeMock;
   let account: SafeMock;
-  let recoveryModule: UnforgettableRecoveryModuleMock;
+  let recoveryModule: UnforgettableRecoveryModule;
 
   async function executeSafeTx(to: string, data: string, operation: bigint = 0n) {
     const value = 0n;
@@ -186,7 +185,7 @@ describe("UnforgettableRecoveryModule", () => {
 
     await account.setup([FIRST, SECOND, THIRD], 2, ZeroAddress, "0x", ZeroAddress, ZeroAddress, 0, ZeroAddress);
 
-    recoveryModule = await ethers.deployContract("UnforgettableRecoveryModuleMock");
+    recoveryModule = await ethers.deployContract("UnforgettableRecoveryModule");
 
     await paymentToken.mint(account, initialTokensAmount);
 
@@ -277,37 +276,16 @@ describe("UnforgettableRecoveryModule", () => {
         .to.emit(account, "RecoveryProviderAdded")
         .withArgs(await newRecoveryManager.getAddress());
 
-      let recoverableOwnersData = recoveryModule.interface.encodeFunctionData("getRecoverableOwners", [
-        await recoveryManager.getAddress(),
+      expect(await recoveryModule.getRecoverableOwners(account, recoveryManager)).to.be.deep.eq([
+        FIRST.address,
+        THIRD.address,
       ]);
 
-      tx = await executeSafeTx(await recoveryModule.getAddress(), recoverableOwnersData, 1n);
+      expect(await recoveryModule.getRecoveryMethodId(account, recoveryManager, FIRST)).to.be.eq(0);
+      expect(await recoveryModule.getRecoveryMethodId(account, recoveryManager, THIRD)).to.be.eq(1);
 
-      await expect(tx).to.emit(account, "RecoverableOwners").withArgs([FIRST.address, THIRD.address]);
-
-      let recoveryMethodIdsData = recoveryModule.interface.encodeFunctionData("getRecoveryMethodIds", [
-        await recoveryManager.getAddress(),
-      ]);
-
-      tx = await executeSafeTx(await recoveryModule.getAddress(), recoveryMethodIdsData, 1n);
-
-      await expect(tx).to.emit(account, "RecoveryMethodIds").withArgs([0, 1]);
-
-      recoverableOwnersData = recoveryModule.interface.encodeFunctionData("getRecoverableOwners", [
-        await newRecoveryManager.getAddress(),
-      ]);
-
-      tx = await executeSafeTx(await recoveryModule.getAddress(), recoverableOwnersData, 1n);
-
-      await expect(tx).to.emit(account, "RecoverableOwners").withArgs([SECOND.address]);
-
-      recoveryMethodIdsData = recoveryModule.interface.encodeFunctionData("getRecoveryMethodIds", [
-        await newRecoveryManager.getAddress(),
-      ]);
-
-      tx = await executeSafeTx(await recoveryModule.getAddress(), recoveryMethodIdsData, 1n);
-
-      await expect(tx).to.emit(account, "RecoveryMethodIds").withArgs([0]);
+      expect(await recoveryModule.getRecoverableOwners(account, newRecoveryManager)).to.be.deep.eq([SECOND.address]);
+      expect(await recoveryModule.getRecoveryMethodId(account, newRecoveryManager, SECOND)).to.be.eq(0);
     });
 
     it("should get exception if try to add recovery provider with inconsistent recovery methods length", async () => {
@@ -425,21 +403,9 @@ describe("UnforgettableRecoveryModule", () => {
         .to.emit(account, "RecoveryProviderRemoved")
         .withArgs(await recoveryManager.getAddress());
 
-      const recoverableOwnersData = recoveryModule.interface.encodeFunctionData("getRecoverableOwners", [
-        await recoveryManager.getAddress(),
-      ]);
-
-      tx = await executeSafeTx(await recoveryModule.getAddress(), recoverableOwnersData, 1n);
-
-      await expect(tx).to.emit(account, "RecoverableOwners").withArgs([]);
-
-      const recoveryMethodIdsData = recoveryModule.interface.encodeFunctionData("getRecoveryMethodIds", [
-        await recoveryManager.getAddress(),
-      ]);
-
-      tx = await executeSafeTx(await recoveryModule.getAddress(), recoveryMethodIdsData, 1n);
-
-      await expect(tx).to.emit(account, "RecoveryMethodIds").withArgs([]);
+      expect(await recoveryModule.getRecoverableOwners(account, recoveryManager)).to.be.deep.eq([]);
+      expect(await recoveryModule.getRecoveryMethodId(account, recoveryManager, SECOND)).to.be.eq(0);
+      expect(await recoveryModule.getRecoveryMethodId(account, recoveryManager, THIRD)).to.be.eq(0);
     });
 
     it("should get exception if try to remover recovery provider without delegate call", async () => {
@@ -523,21 +489,15 @@ describe("UnforgettableRecoveryModule", () => {
         .to.emit(account, "RecoveryProviderAdded")
         .withArgs(await recoveryManager.getAddress());
 
-      let recoverableOwnersData = recoveryModule.interface.encodeFunctionData("getRecoverableOwners", [
-        await recoveryManager.getAddress(),
+      expect(await recoveryModule.getRecoverableOwners(account, recoveryManager)).to.be.deep.eq([
+        FIRST.address,
+        SECOND.address,
+        THIRD.address,
       ]);
 
-      tx = await executeSafeTx(await recoveryModule.getAddress(), recoverableOwnersData, 1n);
-
-      await expect(tx).to.emit(account, "RecoverableOwners").withArgs([FIRST.address, SECOND.address, THIRD.address]);
-
-      let recoveryMethodIdsData = recoveryModule.interface.encodeFunctionData("getRecoveryMethodIds", [
-        await recoveryManager.getAddress(),
-      ]);
-
-      tx = await executeSafeTx(await recoveryModule.getAddress(), recoveryMethodIdsData, 1n);
-
-      await expect(tx).to.emit(account, "RecoveryMethodIds").withArgs([0, 1, 2]);
+      expect(await recoveryModule.getRecoveryMethodId(account, recoveryManager, FIRST)).to.be.eq(0);
+      expect(await recoveryModule.getRecoveryMethodId(account, recoveryManager, SECOND)).to.be.eq(1);
+      expect(await recoveryModule.getRecoveryMethodId(account, recoveryManager, THIRD)).to.be.eq(2);
     });
 
     it("should get exception if try to update recovery provider without delegate call", async () => {

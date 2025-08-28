@@ -14,4 +14,6 @@ interface ISafe {
     function swapOwner(address prevOwner_, address oldOwner_, address newOwner_) external;
 
     function isOwner(address owner_) external view returns (bool);
+
+    function getStorageAt(uint256 offset_, uint256 length_) external view returns (bytes memory);
 }

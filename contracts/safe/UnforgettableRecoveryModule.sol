@@ -162,6 +162,61 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
     }
 
     /**
+     * @notice Retrieves the list of recoverable owners registered under a provider for a Safe account.
+     * @dev Reads the `recoverableOwners` EnumerableSet directly from the Safe wallet
+     *      storage using `getStorageAt`.
+     * @param account_ the address of the Safe wallet where the recovery data is stored.
+     * @param provider_ the address of the recovery provider whose recoverable owners are queried.
+     * @return owners_ an array of owner addresses registered as recoverable under the provider.
+     */
+    function getRecoverableOwners(
+        address account_,
+        address provider_
+    ) external view returns (address[] memory owners_) {
+        bytes32 setSlot_ = keccak256(
+            abi.encode(provider_, UNFORGETTABLE_RECOVERY_MODULE_STORAGE_SLOT)
+        );
+
+        bytes memory dataLength_ = ISafe(account_).getStorageAt(uint256(setSlot_), 1);
+        uint256 ownersCount_ = abi.decode(dataLength_, (uint256));
+
+        owners_ = new address[](ownersCount_);
+
+        for (uint256 i = 0; i < ownersCount_; i++) {
+            bytes32 elementSlot_ = keccak256(abi.encode(setSlot_));
+
+            bytes memory elementData_ = ISafe(account_).getStorageAt(uint256(elementSlot_) + i, 1);
+
+            owners_[i] = abi.decode(elementData_, (address));
+        }
+    }
+
+    /**
+     * @notice Returns the recovery method ID associated with a specific owner and provider.
+     * @dev Reads the `recoveryMethodIds` nested mapping from the Safe wallet
+     *      storage using `getStorageAt`.
+     * @dev Each recoverable owner is assigned a unique method ID during provider registration.
+     * @param account_ the address of the Safe wallet where the recovery data is stored.
+     * @param provider_ the address of the recovery provider managing recovery for the owner.
+     * @param owner_ the address of the Safe owner whose recovery method ID is queried.
+     * @return the recovery method ID assigned to the owner for the specific provider.
+     */
+    function getRecoveryMethodId(
+        address account_,
+        address provider_,
+        address owner_
+    ) external view returns (uint256) {
+        bytes32 innerSlot_ = keccak256(
+            abi.encode(provider_, uint256(UNFORGETTABLE_RECOVERY_MODULE_STORAGE_SLOT) + 1)
+        );
+        bytes32 finalSlot_ = keccak256(abi.encode(owner_, innerSlot_));
+
+        bytes memory methodId_ = ISafe(account_).getStorageAt(uint256(finalSlot_), 1);
+
+        return abi.decode(methodId_, (uint256));
+    }
+
+    /**
      * @dev An internal function to add a new recovery provider and register recoverable owners.
      */
     function _addRecoveryProviderData(address provider_, bytes memory recoveryData_) internal {

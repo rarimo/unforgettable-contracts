@@ -21,6 +21,8 @@ describe("Vault", () => {
   const nativeSubscriptionCost = wei(1, 15);
   const initialSubscriptionDuration = basePaymentPeriod * 12n;
 
+  const vaultName = "Test Vault";
+
   let OWNER: SignerWithAddress;
   let SUBSCRIPTION_SIGNER: SignerWithAddress;
   let FIRST: SignerWithAddress;
@@ -59,13 +61,6 @@ describe("Vault", () => {
     await subscriptionManager.initialize({
       subscriptionCreators: [],
       vaultFactoryAddr: await vaultFactory.getAddress(),
-      vaultNameRetentionPeriod: 3600n * 24n,
-      vaultPaymentTokenEntries: [
-        {
-          paymentToken: ETHER_ADDR,
-          baseVaultNameCost: nativeSubscriptionCost,
-        },
-      ],
       tokensPaymentInitData: {
         basePaymentPeriod: basePaymentPeriod,
         durationFactorEntries: [],
@@ -93,8 +88,8 @@ describe("Vault", () => {
       initialSubscriptionDuration,
     );
 
-    await vaultFactory.connect(FIRST).deployVault(MASTER_KEY1, ETHER_ADDR, initialSubscriptionDuration, "abcd", {
-      value: expectedSubscriptionCost * 2n,
+    await vaultFactory.connect(FIRST).deployVault(MASTER_KEY1, ETHER_ADDR, initialSubscriptionDuration, vaultName, {
+      value: expectedSubscriptionCost,
     });
 
     vault = await ethers.getContractAt("Vault", expectedVaultAddr);

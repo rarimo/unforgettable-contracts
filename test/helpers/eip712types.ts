@@ -31,14 +31,6 @@ export const BuySubscriptionTypes: Record<string, TypedDataField[]> = {
   ],
 };
 
-export const UpdateVaultNameTypes: Record<string, TypedDataField[]> = {
-  UpdateVaultName: [
-    { name: "account", type: "address" },
-    { name: "vaultName", type: "string" },
-    { name: "nonce", type: "uint256" },
-  ],
-};
-
 export const RecoverAccountTypes: Record<string, TypedDataField[]> = {
   SignatureRecovery: [
     { name: "account", type: "address" },

@@ -16,6 +16,8 @@ describe("VaultFactory", () => {
   const nativeSubscriptionCost = wei(1, 15);
   const paymentTokenSubscriptionCost = wei(5);
 
+  const defaultVaultName = "NewVaultName";
+
   let OWNER: SignerWithAddress;
   let SUBSCRIPTION_SIGNER: SignerWithAddress;
   let FIRST: SignerWithAddress;
@@ -61,17 +63,6 @@ describe("VaultFactory", () => {
     await subscriptionManager.initialize({
       subscriptionCreators: [],
       vaultFactoryAddr: await vaultFactory.getAddress(),
-      vaultNameRetentionPeriod: 3600n * 24n,
-      vaultPaymentTokenEntries: [
-        {
-          paymentToken: ETHER_ADDR,
-          baseVaultNameCost: nativeSubscriptionCost,
-        },
-        {
-          paymentToken: await paymentToken.getAddress(),
-          baseVaultNameCost: paymentTokenSubscriptionCost,
-        },
-      ],
       tokensPaymentInitData: {
         basePaymentPeriod: basePaymentPeriod,
         durationFactorEntries: [],
@@ -235,20 +226,17 @@ describe("VaultFactory", () => {
         paymentToken,
         initialSubscriptionDuration,
       );
-      const expectedVaultNameCost = await subscriptionManager.getVaultNameCost(paymentToken, "abc");
 
-      const expectedTotalCost = expectedSubscriptionCost + expectedVaultNameCost;
+      expect(await vaultFactory.isVault(expectedVaultAddr)).to.be.false;
 
-      await paymentToken.connect(FIRST).approve(vaultFactory, expectedTotalCost);
+      await paymentToken.connect(FIRST).approve(vaultFactory, expectedSubscriptionCost);
       const tx = await vaultFactory
         .connect(FIRST)
-        .deployVault(MASTER_KEY1, paymentToken, initialSubscriptionDuration, "abc");
+        .deployVault(MASTER_KEY1, paymentToken, initialSubscriptionDuration, defaultVaultName);
 
       await expect(tx)
         .to.emit(vaultFactory, "VaultDeployed")
-        .withArgs(FIRST.address, expectedVaultAddr, MASTER_KEY1.address);
-
-      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(expectedVaultAddr, "abc");
+        .withArgs(FIRST.address, expectedVaultAddr, MASTER_KEY1.address, defaultVaultName);
 
       expect(await vaultFactory.getVaultCountByCreator(FIRST)).to.be.eq(1);
       expect(await vaultFactory.getVaultsByCreatorPart(FIRST, 0, 10)).to.be.deep.eq([expectedVaultAddr]);
@@ -258,13 +246,13 @@ describe("VaultFactory", () => {
 
       expect(await deployedVault.owner()).to.be.eq(MASTER_KEY1);
 
-      expect(await subscriptionManager.getVaultByName("abc")).to.be.eq(expectedVaultAddr);
-      expect(await subscriptionManager.getVaultName(expectedVaultAddr)).to.be.eq("abc");
+      expect(await vaultFactory.getVaultByName(defaultVaultName)).to.be.eq(expectedVaultAddr);
+      expect(await vaultFactory.getVaultName(expectedVaultAddr)).to.be.eq(defaultVaultName);
 
       await expect(tx).to.changeTokenBalances(
         paymentToken,
         [FIRST, subscriptionManager],
-        [-expectedTotalCost, expectedTotalCost],
+        [-expectedSubscriptionCost, expectedSubscriptionCost],
       );
 
       expect(await subscriptionManager.hasActiveSubscription(expectedVaultAddr)).to.be.true;
@@ -279,30 +267,26 @@ describe("VaultFactory", () => {
         ETHER_ADDR,
         initialSubscriptionDuration,
       );
-      const expectedVaultNameCost = await subscriptionManager.getVaultNameCost(ETHER_ADDR, "1234");
-
-      const expectedTotalCost = expectedSubscriptionCost + expectedVaultNameCost;
 
       const tx = await vaultFactory
         .connect(FIRST)
-        .deployVault(MASTER_KEY1, ETHER_ADDR, initialSubscriptionDuration, "1234", { value: expectedTotalCost });
+        .deployVault(MASTER_KEY1, ETHER_ADDR, initialSubscriptionDuration, defaultVaultName, {
+          value: expectedSubscriptionCost,
+        });
 
       await expect(tx)
         .to.emit(vaultFactory, "VaultDeployed")
-        .withArgs(FIRST.address, expectedVaultAddr, MASTER_KEY1.address);
+        .withArgs(FIRST.address, expectedVaultAddr, MASTER_KEY1.address, defaultVaultName);
 
-      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(expectedVaultAddr, "1234");
-
-      await expect(tx).to.changeEtherBalances([FIRST, subscriptionManager], [-expectedTotalCost, expectedTotalCost]);
+      await expect(tx).to.changeEtherBalances(
+        [FIRST, subscriptionManager],
+        [-expectedSubscriptionCost, expectedSubscriptionCost],
+      );
     });
 
     it("should correctly deploy new vault and buy subscription with signature", async () => {
       const masterKeyNonce = await vaultFactory.nonces(MASTER_KEY1);
       const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, MASTER_KEY1, masterKeyNonce);
-
-      const expectedVaultNameCost = await subscriptionManager.getVaultNameCost(paymentToken, "1234");
-
-      await paymentToken.connect(SECOND).approve(vaultFactory, expectedVaultNameCost);
 
       const sig = await getBuySubscriptionSignature(subscriptionManager, SUBSCRIPTION_SIGNER, {
         sender: SECOND.address,
@@ -312,21 +296,13 @@ describe("VaultFactory", () => {
 
       const tx = await vaultFactory
         .connect(SECOND)
-        .deployVaultWithSignature(MASTER_KEY1, paymentToken, initialSubscriptionDuration, sig, "1234", {
-          value: expectedVaultNameCost,
-        });
+        .deployVaultWithSignature(MASTER_KEY1, initialSubscriptionDuration, sig, defaultVaultName);
 
       await expect(tx)
         .to.emit(vaultFactory, "VaultDeployed")
-        .withArgs(SECOND.address, expectedVaultAddr, MASTER_KEY1.address);
+        .withArgs(SECOND.address, expectedVaultAddr, MASTER_KEY1.address, defaultVaultName);
 
-      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(expectedVaultAddr, "1234");
-
-      await expect(tx).to.changeTokenBalances(
-        paymentToken,
-        [SECOND, subscriptionManager],
-        [-expectedVaultNameCost, expectedVaultNameCost],
-      );
+      await expect(tx).to.changeTokenBalances(paymentToken, [SECOND, subscriptionManager], [0, 0]);
     });
 
     it("should correctly deploy new vault and buy subscription with sbt", async () => {
@@ -336,46 +312,39 @@ describe("VaultFactory", () => {
       const masterKeyNonce = await vaultFactory.nonces(MASTER_KEY1);
       const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, MASTER_KEY1, masterKeyNonce);
 
-      const expectedVaultNameCost = await subscriptionManager.getVaultNameCost(ETHER_ADDR, "12345");
-
-      const tx = await vaultFactory
-        .connect(SECOND)
-        .deployVaultWithSBT(MASTER_KEY1, ETHER_ADDR, sbt, tokenId, "12345", { value: expectedVaultNameCost });
+      const tx = await vaultFactory.connect(SECOND).deployVaultWithSBT(MASTER_KEY1, sbt, tokenId, defaultVaultName);
 
       await expect(tx)
         .to.emit(vaultFactory, "VaultDeployed")
-        .withArgs(SECOND.address, expectedVaultAddr, MASTER_KEY1.address);
+        .withArgs(SECOND.address, expectedVaultAddr, MASTER_KEY1.address, defaultVaultName);
 
-      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(expectedVaultAddr, "12345");
-
-      await expect(tx).to.changeEtherBalances(
-        [SECOND, subscriptionManager],
-        [-expectedVaultNameCost, expectedVaultNameCost],
-      );
+      await expect(tx).to.changeEtherBalances([SECOND, subscriptionManager], [0, 0]);
     });
 
-    it("should correctly deploy new vault without tokens with sbt", async () => {
+    it("should get exception if try to deploy vault with not unique name", async () => {
+      const tokenId1 = 123;
+      const tokenId2 = 124;
+      await sbt.mint(FIRST, tokenId1);
+      await sbt.mint(SECOND, tokenId2);
+
+      await vaultFactory.connect(FIRST).deployVaultWithSBT(MASTER_KEY1, sbt, tokenId1, defaultVaultName);
+
+      expect(await vaultFactory.isVaultNameAvailable(defaultVaultName)).to.be.false;
+
+      await expect(vaultFactory.connect(SECOND).deployVaultWithSBT(MASTER_KEY1, sbt, tokenId2, defaultVaultName))
+        .to.be.revertedWithCustomError(vaultFactory, "VaultNameAlreadyTaken")
+        .withArgs(defaultVaultName);
+    });
+
+    it("should get exception if pass short vault name", async () => {
       const tokenId = 123;
       await sbt.mint(SECOND, tokenId);
 
-      const masterKeyNonce = await vaultFactory.nonces(MASTER_KEY1);
-      const expectedVaultAddr = await vaultFactory.predictVaultAddress(vaultImpl, MASTER_KEY1, masterKeyNonce);
+      const shortName = "abc";
 
-      const expectedVaultNameCost = await subscriptionManager.getVaultNameCost(ETHER_ADDR, "12345678");
-
-      expect(expectedVaultNameCost).to.be.eq(0n);
-
-      const tx = await vaultFactory
-        .connect(SECOND)
-        .deployVaultWithSBT(MASTER_KEY1, ETHER_ADDR, sbt, tokenId, "12345678");
-
-      await expect(tx)
-        .to.emit(vaultFactory, "VaultDeployed")
-        .withArgs(SECOND.address, expectedVaultAddr, MASTER_KEY1.address);
-
-      await expect(tx).to.emit(subscriptionManager, "VaultNameUpdated").withArgs(expectedVaultAddr, "12345678");
-
-      await expect(tx).to.changeEtherBalances([SECOND, subscriptionManager], [0n, 0n]);
+      await expect(vaultFactory.connect(SECOND).deployVaultWithSBT(MASTER_KEY1, sbt, tokenId, shortName))
+        .to.be.revertedWithCustomError(vaultFactory, "VaultNameTooShort")
+        .withArgs(shortName);
     });
   });
 });

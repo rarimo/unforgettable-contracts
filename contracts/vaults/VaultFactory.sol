@@ -40,11 +40,14 @@ contract VaultFactory is
     bytes32 public constant VAULT_FACTORY_STORAGE_SLOT =
         keccak256("unforgettable.contract.vault.factory.storage");
 
+    uint256 public constant MIN_VAULT_NAME_LENGTH = 6;
+
     struct VaultFactoryStorage {
         address vaultImplementation;
         address vaultSubscriptionManager;
         mapping(address => uint256) tokensLimitAmounts;
-        mapping(address => bool) deployedVaults;
+        mapping(address => string) vaultNames;
+        mapping(bytes32 => address) namesToVaults;
         mapping(address => EnumerableSet.AddressSet) vaultsByCreator;
     }
 
@@ -86,43 +89,67 @@ contract VaultFactory is
         uint64 initialSubscriptionDuration_,
         string memory vaultName_
     ) external payable nonReentrant returns (address vaultAddr_) {
-        vaultAddr_ = _deployVault(masterKey_);
+        vaultAddr_ = _deployVault(masterKey_, vaultName_);
 
-        _buyInitialSubscriptionWithToken(
-            paymentToken_,
+        IVaultSubscriptionManager subscriptionManager_ = IVaultSubscriptionManager(
+            _getVaultFactoryStorage().vaultSubscriptionManager
+        );
+
+        uint256 subscriptionCost_ = subscriptionManager_.getSubscriptionCost(
             vaultAddr_,
-            initialSubscriptionDuration_,
-            vaultName_
+            paymentToken_,
+            initialSubscriptionDuration_
+        );
+
+        paymentToken_.receiveTokens(msg.sender, subscriptionCost_);
+
+        uint256 subscriptionValueAmount_;
+
+        if (paymentToken_.isNativeToken()) {
+            subscriptionValueAmount_ = subscriptionCost_;
+        } else {
+            IERC20(paymentToken_).approve(address(subscriptionManager_), subscriptionCost_);
+        }
+
+        subscriptionManager_.buySubscription{value: subscriptionValueAmount_}(
+            vaultAddr_,
+            paymentToken_,
+            initialSubscriptionDuration_
         );
     }
 
     function deployVaultWithSBT(
         address masterKey_,
-        address paymentToken_,
         address sbt_,
         uint256 tokenId_,
         string memory vaultName_
-    ) external payable nonReentrant returns (address vaultAddr_) {
-        vaultAddr_ = _deployVault(masterKey_);
+    ) external nonReentrant returns (address vaultAddr_) {
+        vaultAddr_ = _deployVault(masterKey_, vaultName_);
 
-        _buyInitialSubscriptionWithSBT(paymentToken_, vaultAddr_, sbt_, tokenId_, vaultName_);
+        IVaultSubscriptionManager subscriptionManager_ = IVaultSubscriptionManager(
+            _getVaultFactoryStorage().vaultSubscriptionManager
+        );
+
+        subscriptionManager_.buySubscriptionWithSBT(vaultAddr_, sbt_, msg.sender, tokenId_);
     }
 
     function deployVaultWithSignature(
         address masterKey_,
-        address paymentToken_,
         uint64 initialSubscriptionDuration_,
         bytes memory signature_,
         string memory vaultName_
-    ) external payable nonReentrant returns (address vaultAddr_) {
-        vaultAddr_ = _deployVault(masterKey_);
+    ) external nonReentrant returns (address vaultAddr_) {
+        vaultAddr_ = _deployVault(masterKey_, vaultName_);
 
-        _buyInitialSubscriptionWithSignature(
-            paymentToken_,
+        IVaultSubscriptionManager subscriptionManager_ = IVaultSubscriptionManager(
+            _getVaultFactoryStorage().vaultSubscriptionManager
+        );
+
+        subscriptionManager_.buySubscriptionWithSignature(
+            msg.sender,
             vaultAddr_,
             initialSubscriptionDuration_,
-            signature_,
-            vaultName_
+            signature_
         );
     }
 
@@ -139,7 +166,7 @@ contract VaultFactory is
     }
 
     function isVault(address vaultAddr_) external view returns (bool) {
-        return _getVaultFactoryStorage().deployedVaults[vaultAddr_];
+        return bytes(getVaultName(vaultAddr_)).length > 0;
     }
 
     function getTokenLimitAmount(address token_) external view returns (uint256) {
@@ -166,6 +193,18 @@ contract VaultFactory is
         return ERC1967Utils.getImplementation();
     }
 
+    function isVaultNameAvailable(string memory name_) public view returns (bool) {
+        return getVaultByName(name_) == address(0);
+    }
+
+    function getVaultName(address vault_) public view returns (string memory) {
+        return _getVaultFactoryStorage().vaultNames[vault_];
+    }
+
+    function getVaultByName(string memory vaultName_) public view returns (address) {
+        return _getVaultFactoryStorage().namesToVaults[keccak256(bytes(vaultName_))];
+    }
+
     function getDeployVaultSalt(address masterKey_, uint256 nonce_) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(masterKey_, nonce_));
     }
@@ -186,7 +225,10 @@ contract VaultFactory is
         emit TokenLimitAmountUpdated(token_, newLimitAmount_);
     }
 
-    function _deployVault(address masterKey_) internal returns (address vaultAddr_) {
+    function _deployVault(
+        address masterKey_,
+        string memory vaultName_
+    ) internal returns (address vaultAddr_) {
         VaultFactoryStorage storage $ = _getVaultFactoryStorage();
 
         bytes32 salt_ = getDeployVaultSalt(masterKey_, _useNonce(masterKey_));
@@ -195,124 +237,25 @@ contract VaultFactory is
 
         IVault(vaultAddr_).initialize(masterKey_);
 
-        $.deployedVaults[vaultAddr_] = true;
+        _setVaultName(vaultAddr_, vaultName_);
+
         $.vaultsByCreator[msg.sender].add(vaultAddr_);
 
-        emit VaultDeployed(msg.sender, vaultAddr_, masterKey_);
+        emit VaultDeployed(msg.sender, vaultAddr_, masterKey_, vaultName_);
+    }
+
+    function _setVaultName(address vault_, string memory vaultName_) internal {
+        require(bytes(vaultName_).length >= MIN_VAULT_NAME_LENGTH, VaultNameTooShort(vaultName_));
+        require(isVaultNameAvailable(vaultName_), VaultNameAlreadyTaken(vaultName_));
+
+        VaultFactoryStorage storage $ = _getVaultFactoryStorage();
+
+        $.vaultNames[vault_] = vaultName_;
+        $.namesToVaults[keccak256(bytes(vaultName_))] = vault_;
     }
 
     function _deploy2(address implementation_, bytes32 salt_) internal returns (address) {
         return payable(address(new ERC1967Proxy{salt: salt_}(implementation_, new bytes(0))));
-    }
-
-    function _buyInitialSubscriptionWithToken(
-        address paymentToken_,
-        address vaultAddr_,
-        uint64 duration_,
-        string memory vaultName_
-    ) internal {
-        IVaultSubscriptionManager subscriptionManager_ = IVaultSubscriptionManager(
-            _getVaultFactoryStorage().vaultSubscriptionManager
-        );
-
-        uint256 subscriptionCost_ = subscriptionManager_.getSubscriptionCost(
-            vaultAddr_,
-            paymentToken_,
-            duration_
-        );
-
-        uint256 vaultNameCost_ = subscriptionManager_.getVaultNameCost(paymentToken_, vaultName_);
-
-        uint256 totalCost_ = subscriptionCost_ + vaultNameCost_;
-
-        paymentToken_.receiveTokens(msg.sender, totalCost_);
-
-        uint256 subscriptionValueAmount_;
-        uint256 nameValueAmount_;
-
-        if (paymentToken_.isNativeToken()) {
-            subscriptionValueAmount_ = subscriptionCost_;
-            nameValueAmount_ = vaultNameCost_;
-        } else {
-            IERC20(paymentToken_).approve(address(subscriptionManager_), totalCost_);
-        }
-
-        subscriptionManager_.buySubscription{value: subscriptionValueAmount_}(
-            vaultAddr_,
-            paymentToken_,
-            duration_
-        );
-
-        subscriptionManager_.updateVaultName{value: nameValueAmount_}(
-            vaultAddr_,
-            paymentToken_,
-            vaultName_
-        );
-    }
-
-    function _buyInitialSubscriptionWithSBT(
-        address paymentToken_,
-        address vaultAddr_,
-        address sbt_,
-        uint256 tokenId_,
-        string memory vaultName_
-    ) internal {
-        IVaultSubscriptionManager subscriptionManager_ = IVaultSubscriptionManager(
-            _getVaultFactoryStorage().vaultSubscriptionManager
-        );
-
-        subscriptionManager_.buySubscriptionWithSBT(vaultAddr_, sbt_, msg.sender, tokenId_);
-
-        _buyInitialVaultName(paymentToken_, vaultAddr_, vaultName_);
-    }
-
-    function _buyInitialSubscriptionWithSignature(
-        address paymentToken_,
-        address vaultAddr_,
-        uint64 duration_,
-        bytes memory signature_,
-        string memory vaultName_
-    ) internal {
-        IVaultSubscriptionManager subscriptionManager_ = IVaultSubscriptionManager(
-            _getVaultFactoryStorage().vaultSubscriptionManager
-        );
-
-        subscriptionManager_.buySubscriptionWithSignature(
-            msg.sender,
-            vaultAddr_,
-            duration_,
-            signature_
-        );
-
-        _buyInitialVaultName(paymentToken_, vaultAddr_, vaultName_);
-    }
-
-    function _buyInitialVaultName(
-        address paymentToken_,
-        address vaultAddr_,
-        string memory vaultName_
-    ) internal {
-        IVaultSubscriptionManager subscriptionManager_ = IVaultSubscriptionManager(
-            _getVaultFactoryStorage().vaultSubscriptionManager
-        );
-
-        uint256 vaultNameCost_ = subscriptionManager_.getVaultNameCost(paymentToken_, vaultName_);
-
-        paymentToken_.receiveTokens(msg.sender, vaultNameCost_);
-
-        uint256 nameValueAmount_;
-
-        if (paymentToken_.isNativeToken()) {
-            nameValueAmount_ = vaultNameCost_;
-        } else {
-            IERC20(paymentToken_).approve(address(subscriptionManager_), vaultNameCost_);
-        }
-
-        subscriptionManager_.updateVaultName{value: nameValueAmount_}(
-            vaultAddr_,
-            paymentToken_,
-            vaultName_
-        );
     }
 
     /**

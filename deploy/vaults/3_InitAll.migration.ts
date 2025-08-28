@@ -28,9 +28,7 @@ export = async (deployer: Deployer) => {
 
   await vaultSubscriptionManager.initialize({
     vaultFactoryAddr: await vaultFactory.getAddress(),
-    vaultNameRetentionPeriod: config.vaultSubscriptionManagerConfig.vaultNameRetentionPeriod,
     subscriptionCreators: [],
-    vaultPaymentTokenEntries: config.vaultSubscriptionManagerConfig.vaultPaymentTokenEntries,
     tokensPaymentInitData: config.vaultSubscriptionManagerConfig.paymentTokenModuleConfig,
     sbtPaymentInitData: config.vaultSubscriptionManagerConfig.sbtPaymentModuleConfig,
     sigSubscriptionInitData: config.vaultSubscriptionManagerConfig.signatureSubscriptionModuleConfig,

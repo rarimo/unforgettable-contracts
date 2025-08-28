@@ -8,21 +8,6 @@ export const deployConfig: DeployConfig = {
     reservedTokensAmountPerAddress: wei(100, 18),
   },
   vaultSubscriptionManagerConfig: {
-    vaultNameRetentionPeriod: 3600n * 24n * 30n * 12n,
-    vaultPaymentTokenEntries: [
-      {
-        paymentToken: ETHER_ADDR,
-        baseVaultNameCost: wei(5, 14),
-      },
-      {
-        paymentToken: "0xbb2e698669534eaBa3e276F17802723371178581",
-        baseVaultNameCost: 1500000n,
-      },
-      {
-        paymentToken: "0x91c6568751B94f559D84e4Cf83Eb6fC05fb9B9E8",
-        baseVaultNameCost: 1000000n,
-      },
-    ],
     paymentTokenModuleConfig: {
       basePaymentPeriod: 600n,
       durationFactorEntries: [

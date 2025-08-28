@@ -83,7 +83,7 @@ contract VaultSubscriptionManager is
         address sbt_,
         address sbtOwner_,
         uint256 tokenId_
-    ) public onlySupportedSBT(sbt_) onlyVault(vault_) onlyVaultFactory nonReentrant {
+    ) public onlySupportedSBT(sbt_) onlyVault(vault_) onlyVaultFactory nonReentrant whenNotPaused {
         _buySubscriptionWithSBT(vault_, sbt_, sbtOwner_, tokenId_);
     }
 
@@ -100,7 +100,7 @@ contract VaultSubscriptionManager is
         address vault_,
         uint64 duration_,
         bytes memory signature_
-    ) public onlyVault(vault_) onlyVaultFactory nonReentrant {
+    ) public onlyVault(vault_) onlyVaultFactory nonReentrant whenNotPaused {
         _buySubscriptionWithSignature(sender_, vault_, duration_, signature_);
     }
 

@@ -312,6 +312,14 @@ describe("VaultSubscriptionManager", () => {
       await expect(sbt.ownerOf(tokenId)).to.be.revertedWithCustomError(sbt, "ERC721NonexistentToken").withArgs(tokenId);
     });
 
+    it("should get exception if paused", async () => {
+      await subscriptionManager.pause();
+
+      await expect(
+        vaultFactory.callBuySubscriptionWithSBT(subscriptionManager, FIRST, sbt, FIRST, tokenId),
+      ).to.be.revertedWithCustomError(subscriptionManager, "EnforcedPause");
+    });
+
     it("should get exception if pass not a vault address", async () => {
       await expect(vaultFactory.callBuySubscriptionWithSBT(subscriptionManager, SECOND, sbt, FIRST, tokenId))
         .to.be.revertedWithCustomError(subscriptionManager, "NotAVault")
@@ -459,6 +467,24 @@ describe("VaultSubscriptionManager", () => {
       await expect(tx)
         .to.emit(subscriptionManager, "SubscriptionExtended")
         .withArgs(FIRST.address, duration, expectedEndTime);
+    });
+
+    it("should get exception if paused", async () => {
+      await subscriptionManager.pause();
+      await vaultFactory.setVaultName(FIRST, defaultVaultName);
+
+      const duration = basePaymentPeriod * 12n;
+
+      const currentNonce = await subscriptionManager.nonces(OWNER);
+      const signature = await getBuySubscriptionSignature(subscriptionManager, SUBSCRIPTION_SIGNER, {
+        sender: OWNER.address,
+        duration: duration,
+        nonce: currentNonce,
+      });
+
+      await expect(
+        vaultFactory.callBuySubscriptionWithSignature(subscriptionManager, OWNER, FIRST, duration, signature),
+      ).to.be.revertedWithCustomError(subscriptionManager, "EnforcedPause");
     });
 
     it("should get exception if pass not a vault address", async () => {

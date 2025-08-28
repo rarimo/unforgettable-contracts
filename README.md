@@ -37,8 +37,8 @@ contracts
 │   └── ReservedRMO — "ERC-20 token granting each vault a one-time reserved token allocation"
 └── vaults
     ├── Vault — "A vault controlled with a master key EIP-712 signature"
-    ├── VaultFactory — "Deterministic CREATE2 factory for Vaults"
-    └── VaultSubscriptionManager — "Vault-specific subscription manager with support for a registry of purchasable vault names"
+    ├── VaultFactory — "Deterministic CREATE2 factory for Vaults with support for a registry of unchangeable vault names"
+    └── VaultSubscriptionManager — "Vault-specific subscription manager"
 ```
 
 #### Usage

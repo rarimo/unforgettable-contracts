@@ -1,25 +1,25 @@
-import { ETHER_ADDR, PRECISION, wei } from "@/scripts";
+import { ETHER_ADDR, PRECISION, wei } from "@scripts";
 
 import { DeployConfig } from "./types";
 
 export const deployConfig: DeployConfig = {
-  contractsOwner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+  contractsOwner: "",
   reservedRMOConfig: {
     reservedTokensAmountPerAddress: wei(100, 18),
   },
   vaultSubscriptionManagerConfig: {
     paymentTokenModuleConfig: {
-      basePaymentPeriod: 3600n * 24n * 30n,
+      basePaymentPeriod: 600n,
       durationFactorEntries: [
         {
-          duration: 3600n * 24n * 30n * 12n,
+          duration: 600n * 6n,
           factor: PRECISION * 95n,
         },
       ],
       paymentTokenEntries: [
         {
           paymentToken: ETHER_ADDR,
-          baseSubscriptionCost: wei(1, 16),
+          baseSubscriptionCost: wei(5, 11),
         },
       ],
     },
@@ -27,30 +27,35 @@ export const deployConfig: DeployConfig = {
       sbtEntries: [],
     },
     signatureSubscriptionModuleConfig: {
-      subscriptionSigner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      subscriptionSigner: "",
     },
   },
   accountSubscriptionManagerConfig: {
     paymentTokenModuleConfig: {
-      basePaymentPeriod: 3600n * 24n * 30n,
+      basePaymentPeriod: 600n,
       durationFactorEntries: [
         {
-          duration: 3600n * 24n * 30n * 12n,
+          duration: 600n * 6n,
           factor: PRECISION * 95n,
         },
       ],
       paymentTokenEntries: [
         {
           paymentToken: ETHER_ADDR,
-          baseSubscriptionCost: wei(1, 16),
+          baseSubscriptionCost: wei(5, 11),
         },
       ],
     },
     sbtPaymentModuleConfig: {
-      sbtEntries: [],
+      sbtEntries: [
+        {
+          sbt: "0x0352Df2C21fB0A0405Dd3264e01913f6C51A0344",
+          subscriptionDurationPerToken: 3600n,
+        },
+      ],
     },
     signatureSubscriptionModuleConfig: {
-      subscriptionSigner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+      subscriptionSigner: "",
     },
   },
 };

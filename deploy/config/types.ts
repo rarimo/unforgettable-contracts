@@ -3,7 +3,6 @@ import {
   ISignatureSubscriptionModule,
   ITokensPaymentModule,
 } from "@/generated-types/ethers/contracts/core/subscription/BaseSubscriptionManager";
-import { IVaultSubscriptionManager } from "@/generated-types/ethers/contracts/vaults/VaultSubscriptionManager";
 
 export type DeployConfig = {
   contractsOwner: string;
@@ -17,8 +16,6 @@ export type ReservedRMOConfig = {
 };
 
 export type VaultSubscriptionManagerConfig = {
-  vaultNameRetentionPeriod: bigint;
-  vaultPaymentTokenEntries: IVaultSubscriptionManager.VaultPaymentTokenUpdateEntryStruct[];
   paymentTokenModuleConfig: ITokensPaymentModule.TokensPaymentModuleInitDataStruct;
   sbtPaymentModuleConfig: ISBTPaymentModule.SBTPaymentModuleInitDataStruct;
   signatureSubscriptionModuleConfig: ISignatureSubscriptionModule.SigSubscriptionModuleInitDataStruct;

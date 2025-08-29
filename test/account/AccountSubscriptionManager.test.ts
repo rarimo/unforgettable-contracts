@@ -694,6 +694,14 @@ describe("AccountSubscriptionManager", () => {
         .to.be.revertedWithCustomError(subscriptionManager, "InvalidSubscriptionDuration")
         .withArgs(invalidDuration);
     });
+
+    it("should get exception if paused", async () => {
+      await subscriptionManager.pause();
+
+      await expect(subscriptionManager.connect(FIRST).buySubscription(FIRST, ETHER_ADDR, basePaymentPeriod))
+        .to.be.revertedWithCustomError(subscriptionManager, "EnforcedPause")
+        .withArgs();
+    });
   });
 
   describe("#buySubscriptionWithSBT", () => {
@@ -759,6 +767,14 @@ describe("AccountSubscriptionManager", () => {
         .to.be.revertedWithCustomError(subscriptionManager, "NotASBTOwner")
         .withArgs(await sbt.getAddress(), SECOND.address, tokenId);
     });
+
+    it("should get exception if paused", async () => {
+      await subscriptionManager.pause();
+
+      await expect(subscriptionManager.connect(FIRST).buySubscriptionWithSBT(FIRST, sbt, tokenId))
+        .to.be.revertedWithCustomError(subscriptionManager, "EnforcedPause")
+        .withArgs();
+    });
   });
 
   describe("#buySubscriptionWithSignature", () => {
@@ -786,6 +802,23 @@ describe("AccountSubscriptionManager", () => {
       await expect(tx)
         .to.emit(subscriptionManager, "SubscriptionExtended")
         .withArgs(FIRST.address, duration, expectedEndTime);
+    });
+
+    it("should get exception if paused", async () => {
+      await subscriptionManager.pause();
+
+      const duration = basePaymentPeriod * 12n;
+
+      const currentNonce = await subscriptionManager.nonces(OWNER);
+      const signature = await getBuySubscriptionSignature(subscriptionManager, SUBSCRIPTION_SIGNER, {
+        sender: OWNER.address,
+        duration: duration,
+        nonce: currentNonce,
+      });
+
+      await expect(subscriptionManager.buySubscriptionWithSignature(FIRST, duration, signature))
+        .to.be.revertedWithCustomError(subscriptionManager, "EnforcedPause")
+        .withArgs();
     });
   });
 });

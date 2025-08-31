@@ -6,7 +6,7 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 import { expect } from "chai";
-import { AddressLike } from "ethers";
+import { AddressLike, ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
 
 import { getBuySubscriptionSignature, getUpdateVaultNameSignature } from "../helpers/sign-utils";
@@ -101,6 +101,11 @@ describe("VaultSubscriptionManager", () => {
       sigSubscriptionInitData: {
         subscriptionSigner: SUBSCRIPTION_SIGNER,
       },
+      crossChainInitData: {
+        subscriptionsSMTMaxDepth: 80,
+        subscriptionsSynchronizer: ZeroAddress,
+        targetChains: [100],
+      },
     });
 
     await paymentToken.mint(FIRST, initialTokensAmount);
@@ -167,6 +172,11 @@ describe("VaultSubscriptionManager", () => {
           sigSubscriptionInitData: {
             subscriptionSigner: SUBSCRIPTION_SIGNER,
           },
+          crossChainInitData: {
+            subscriptionsSMTMaxDepth: 80,
+            subscriptionsSynchronizer: ZeroAddress,
+            targetChains: [100],
+          },
         }),
       )
         .to.be.revertedWithCustomError(subscriptionManager, "OnlyDeployer")
@@ -190,6 +200,11 @@ describe("VaultSubscriptionManager", () => {
           },
           sigSubscriptionInitData: {
             subscriptionSigner: SUBSCRIPTION_SIGNER,
+          },
+          crossChainInitData: {
+            subscriptionsSMTMaxDepth: 80,
+            subscriptionsSynchronizer: ZeroAddress,
+            targetChains: [100],
           },
         }),
       ).to.be.revertedWithCustomError(subscriptionManager, "InvalidInitialization");

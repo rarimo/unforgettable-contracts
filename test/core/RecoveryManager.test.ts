@@ -86,6 +86,11 @@ describe("RecoveryManager", () => {
       sigSubscriptionInitData: {
         subscriptionSigner: OWNER,
       },
+      crossChainInitData: {
+        subscriptionsSMTMaxDepth: 80,
+        subscriptionsSynchronizer: ZeroAddress,
+        targetChains: [100],
+      },
     });
 
     await paymentToken.mint(FIRST, initialTokensAmount);

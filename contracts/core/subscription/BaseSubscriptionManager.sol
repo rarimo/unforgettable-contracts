@@ -13,6 +13,7 @@ import {ITokensPaymentModule} from "../../interfaces/core/subscription/ITokensPa
 import {ISBTPaymentModule} from "../../interfaces/core/subscription/ISBTPaymentModule.sol";
 import {ISignatureSubscriptionModule} from "../../interfaces/core/subscription/ISignatureSubscriptionModule.sol";
 
+import {BaseSubscriptionModule} from "./modules/BaseSubscriptionModule.sol";
 import {SBTPaymentModule} from "./modules/SBTPaymentModule.sol";
 import {TokensPaymentModule} from "./modules/TokensPaymentModule.sol";
 import {SignatureSubscriptionModule} from "./modules/SignatureSubscriptionModule.sol";
@@ -133,6 +134,12 @@ abstract contract BaseSubscriptionManager is
         _setSubscriptionSigner(newSigner_);
     }
 
+    function setSubscriptionSynchronizer(
+        address subscriptionSynchronizer_
+    ) public virtual onlyOwner {
+        _setSubscriptionSynchronizer(subscriptionSynchronizer_);
+    }
+
     function createSubscription(address account_) public virtual onlySubscriptionCreator {
         _createSubscription(account_);
     }
@@ -203,6 +210,13 @@ abstract contract BaseSubscriptionManager is
         _extendSubscription(account_, 0);
 
         emit SubscriptionCreated(account_, block.timestamp);
+    }
+
+    function _extendSubscription(
+        address account_,
+        uint64 duration_
+    ) internal virtual override(CrossChainModule, BaseSubscriptionModule) {
+        super._extendSubscription(account_, duration_);
     }
 
     // solhint-disable-next-line no-empty-blocks

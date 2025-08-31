@@ -5,7 +5,8 @@ import {IBaseSubscriptionModule} from "./IBaseSubscriptionModule.sol";
 
 interface ICrossChainModule is IBaseSubscriptionModule {
     struct CrossChainModuleInitData {
-        address subscriptionSynchronizer;
+        uint32 subscriptionsSMTMaxDepth;
+        address subscriptionsSynchronizer;
         uint16[] targetChains;
     }
 }

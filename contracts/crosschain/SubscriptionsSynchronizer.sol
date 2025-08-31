@@ -9,29 +9,36 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 
 import {ADeployerGuard} from "@solarity/solidity-lib/utils/ADeployerGuard.sol";
 
-import {ISubscriptionSynchronizer} from "../interfaces/crosschain/ISubscriptionSynchronizer.sol";
+import {SparseMerkleTree} from "@solarity/solidity-lib/libs/data-structures/SparseMerkleTree.sol";
 
-contract SubscriptionSynchronizer is
-    ISubscriptionSynchronizer,
+import {ISubscriptionManager} from "../interfaces/core/ISubscriptionManager.sol";
+import {ISubscriptionsSynchronizer} from "../interfaces/crosschain/ISubscriptionsSynchronizer.sol";
+
+contract SubscriptionsSynchronizer is
+    ISubscriptionsSynchronizer,
     ADeployerGuard,
     OwnableUpgradeable
 {
+    using SparseMerkleTree for SparseMerkleTree.Bytes32SMT;
     using EnumerableSet for EnumerableSet.AddressSet;
 
     uint256 constant GAS_LIMIT = 50000; // Adjust the gas limit as needed
 
-    bytes32 public constant SUBSCRIPTION_SYNCHRONIZER_STORAGE_SLOT =
-        keccak256("unforgettable.contract.subscription.synchronizer.storage");
+    bytes32 public constant SUBSCRIPTIONS_SYNCHRONIZER_STORAGE_SLOT =
+        keccak256("unforgettable.contract.subscriptions.synchronizer.storage");
 
     struct SubscriptionSynchronizerStorage {
         IWormholeRelayer wormholeRelayer;
+        SparseMerkleTree.Bytes32SMT subscriptionsSMT;
         EnumerableSet.AddressSet subscriptionManagers;
         mapping(uint16 chainId => address) targetAddresses;
     }
 
     event WormholeRelayerUpdated(address indexed relayer);
     event SubscriptionManagerAdded(address indexed subscriptionManager);
+    event SubscriptionManagerRemoved(address indexed subscriptionManager);
     event DestinationAdded(uint16 indexed chainId, address indexed targetAddress);
+    event DestinationRemoved(uint16 indexed chainId);
 
     error NotSubscriptionManager();
     error ZeroAddr(string fieldName);
@@ -54,7 +61,7 @@ contract SubscriptionSynchronizer is
     }
 
     function _getSSSStorage() private pure returns (SubscriptionSynchronizerStorage storage _sss) {
-        bytes32 slot_ = SUBSCRIPTION_SYNCHRONIZER_STORAGE_SLOT;
+        bytes32 slot_ = SUBSCRIPTIONS_SYNCHRONIZER_STORAGE_SLOT;
 
         assembly ("memory-safe") {
             _sss.slot := slot_
@@ -62,7 +69,7 @@ contract SubscriptionSynchronizer is
     }
 
     function initialize(
-        SubscriptionSynchronizerInitData calldata initData_
+        SubscriptionsSynchronizerInitData calldata initData_
     ) external initializer onlyDeployer {
         __Ownable_init(msg.sender);
 
@@ -81,6 +88,20 @@ contract SubscriptionSynchronizer is
         }
     }
 
+    function getSubscriptionsSMTRoot() public view returns (bytes32) {
+        return _getSSSStorage().subscriptionsSMT.getRoot();
+    }
+
+    function getSubscriptionsSMTProof(
+        address subscriptionManager_,
+        address account_
+    ) public view returns (SparseMerkleTree.Proof memory) {
+        return
+            _getSSSStorage().subscriptionsSMT.getProof(
+                keccak256(abi.encode(subscriptionManager_, account_))
+            );
+    }
+
     function sync(uint16 targetChain_) external payable {
         SubscriptionSynchronizerStorage storage $ = _getSSSStorage();
 
@@ -92,7 +113,6 @@ contract SubscriptionSynchronizer is
 
         require(msg.value >= _cost, InsufficientFundsForCrossChainDelivery());
 
-        // TODO: construct message
         bytes memory _message = _constructMessage();
 
         $.wormholeRelayer.sendPayloadToEvm{value: _cost}(
@@ -116,10 +136,38 @@ contract SubscriptionSynchronizer is
         emit SubscriptionManagerAdded(subscriptionManager_);
     }
 
+    function removeSubscriptionManager(address subscriptionManager_) public onlyOwner {
+        _removeSubscriptionManager(subscriptionManager_);
+
+        emit SubscriptionManagerRemoved(subscriptionManager_);
+    }
+
     function addDestination(Destination calldata destination_) public onlyOwner {
         _addDestination(destination_);
 
         emit DestinationAdded(destination_.chainId, destination_.targetAddress);
+    }
+
+    function removeDestination(uint16 chainId_) public onlyOwner {
+        _removeDestination(chainId_);
+
+        emit DestinationRemoved(chainId_);
+    }
+
+    function saveSubscriptionData(
+        address account_,
+        uint64 startTime_,
+        uint64 endTime_,
+        bool isNewSubscription_
+    ) public onlySubscriptionManager {
+        bytes32 _key = keccak256(abi.encode(msg.sender, account_));
+        bytes32 _value = keccak256(abi.encode(msg.sender, account_, startTime_, endTime_));
+
+        if (isNewSubscription_) {
+            _addSMTNode(_key, _value);
+        } else {
+            _updateSMTNode(_key, _value);
+        }
     }
 
     function quoteCrossChainCost(uint16 targetChain_) public view returns (uint256 _cost) {
@@ -132,6 +180,10 @@ contract SubscriptionSynchronizer is
 
     function isChainSupported(uint16 chainId_) public view returns (bool) {
         return _getSSSStorage().targetAddresses[chainId_] != address(0);
+    }
+
+    function _initializeSubscriptionsSMT(uint32 maxDepth_) internal {
+        _getSSSStorage().subscriptionsSMT.initialize(maxDepth_);
     }
 
     function _updateWormholeRelayer(address wormholeRelayer_) internal {
@@ -162,11 +214,43 @@ contract SubscriptionSynchronizer is
         $.targetAddresses[_chainId] = _targetAddress;
     }
 
+    function _removeSubscriptionManager(address subscriptionManager_) internal {
+        _checkAddress(subscriptionManager_, "SubscriptionManager");
+
+        _getSSSStorage().subscriptionManagers.remove(subscriptionManager_);
+    }
+
+    function _removeDestination(uint16 chainId_) internal {
+        require(chainId_ != 0 && chainId_ != block.chainid, InvalidChainId(chainId_));
+
+        SubscriptionSynchronizerStorage storage $ = _getSSSStorage();
+
+        address _targetAddress = $.targetAddresses[chainId_];
+
+        require(_targetAddress != address(0), ChainNotSupported(chainId_));
+
+        delete $.targetAddresses[chainId_];
+    }
+
     function _checkAddress(address addr_, string memory fieldName_) internal pure {
         require(addr_ != address(0), ZeroAddr(fieldName_));
     }
 
-    function _constructMessage() internal pure returns (bytes memory) {
-        return abi.encode(keccak256("Hello, Wormhole!")); // Placeholder message
+    function _constructMessage() internal view returns (bytes memory) {
+        return
+            abi.encode(
+                SyncMessage({
+                    syncTimestamp: block.timestamp,
+                    subscriptionsSMTRoot: getSubscriptionsSMTRoot()
+                })
+            );
+    }
+
+    function _addSMTNode(bytes32 key_, bytes32 value_) internal {
+        _getSSSStorage().subscriptionsSMT.add(key_, value_);
+    }
+
+    function _updateSMTNode(bytes32 key_, bytes32 value_) internal {
+        _getSSSStorage().subscriptionsSMT.update(key_, value_);
     }
 }

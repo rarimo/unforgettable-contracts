@@ -5,25 +5,25 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 
 import {ADeployerGuard} from "@solarity/solidity-lib/utils/ADeployerGuard.sol";
 
-import {ISubscriptionStateReceiver} from "../interfaces/crosschain/ISubscriptionStateReceiver.sol";
+import {ISubscriptionsStateReceiver} from "../interfaces/crosschain/ISubscriptionsStateReceiver.sol";
 
-contract SubscriptionStateReceiver is
-    ISubscriptionStateReceiver,
+contract SubscriptionsStateReceiver is
+    ISubscriptionsStateReceiver,
     OwnableUpgradeable,
     ADeployerGuard
 {
-    bytes32 public constant SUBSCRIPTION_STATE_RECEIVER_STORAGE_SLOT =
-        keccak256("unforgettable.contract.subscription.receiver.storage");
+    bytes32 public constant SUBSCRIPTIONS_STATE_RECEIVER_STORAGE_SLOT =
+        keccak256("unforgettable.contract.subscriptions.receiver.storage");
 
-    struct SubscriptionStateReceiverStorage {
+    struct SubscriptionsStateReceiverStorage {
         address wormholeRelayer;
-        address subscriptionStateSynchronizer;
+        address subscriptionsSynchronizer;
         uint16 sourceChainId;
     }
 
     event MessageReceived(bytes message);
     event WormholeRelayerUpdated(address indexed relayer);
-    event SubscriptionStateSynchronizerUpdated(address indexed synchronizer);
+    event SubscriptionsSynchronizerUpdated(address indexed synchronizer);
     event SourceChainIdUpdated(uint16 indexed chainId);
 
     error NotWormholeRelayer(address);
@@ -45,21 +45,21 @@ contract SubscriptionStateReceiver is
     }
 
     function initialize(
-        SubscriptionStateReceiverInitData memory initData_
+        SubscriptionsStateReceiverInitData memory initData_
     ) external initializer onlyDeployer {
         __Ownable_init(msg.sender);
 
         _updateWormholeRelayer(initData_.wormholeRelayer);
-        _updateSubscriptionStateSynchronizer(initData_.subscriptionStateSynchronizer);
+        _updateSubscriptionsSynchronizer(initData_.subscriptionsSynchronizer);
         _updateSourceChainId(initData_.sourceChainId);
     }
 
     function _getSSRStorage()
         private
         pure
-        returns (SubscriptionStateReceiverStorage storage _ssrs)
+        returns (SubscriptionsStateReceiverStorage storage _ssrs)
     {
-        bytes32 slot_ = SUBSCRIPTION_STATE_RECEIVER_STORAGE_SLOT;
+        bytes32 slot_ = SUBSCRIPTIONS_STATE_RECEIVER_STORAGE_SLOT;
 
         assembly ("memory-safe") {
             _ssrs.slot := slot_
@@ -72,12 +72,12 @@ contract SubscriptionStateReceiver is
         emit WormholeRelayerUpdated(wormholeRelayer_);
     }
 
-    function updateSubscriptionStateSynchronizer(
+    function updateSubscriptionsSynchronizer(
         address subscriptionStateSynchronizer_
     ) public onlyOwner {
-        _updateSubscriptionStateSynchronizer(subscriptionStateSynchronizer_);
+        _updateSubscriptionsSynchronizer(subscriptionStateSynchronizer_);
 
-        emit SubscriptionStateSynchronizerUpdated(subscriptionStateSynchronizer_);
+        emit SubscriptionsSynchronizerUpdated(subscriptionStateSynchronizer_);
     }
 
     function updateSourceChainId(uint16 sourceChainId_) public onlyOwner {
@@ -93,11 +93,11 @@ contract SubscriptionStateReceiver is
         uint16 sourceChain_,
         bytes32 // delivery hash
     ) public payable override onlyWormholeRelayer {
-        SubscriptionStateReceiverStorage storage $ = _getSSRStorage();
+        SubscriptionsStateReceiverStorage storage $ = _getSSRStorage();
 
         require(sourceChain_ == $.sourceChainId, InvalidSourceChainId());
         require(
-            address(uint160(uint256(sourceAddress_))) == $.subscriptionStateSynchronizer,
+            address(uint160(uint256(sourceAddress_))) == $.subscriptionsSynchronizer,
             InvalidSourceAddress()
         );
 
@@ -112,12 +112,10 @@ contract SubscriptionStateReceiver is
         _getSSRStorage().wormholeRelayer = wormholeRelayer_;
     }
 
-    function _updateSubscriptionStateSynchronizer(
-        address subscriptionStateSynchronizer_
-    ) internal {
-        _checkAddress(subscriptionStateSynchronizer_, "SubscriptionStateSynchronizer");
+    function _updateSubscriptionsSynchronizer(address subscriptionsSynchronizer_) internal {
+        _checkAddress(subscriptionsSynchronizer_, "SubscriptionsSynchronizer");
 
-        _getSSRStorage().subscriptionStateSynchronizer = subscriptionStateSynchronizer_;
+        _getSSRStorage().subscriptionsSynchronizer = subscriptionsSynchronizer_;
     }
 
     function _updateSourceChainId(uint16 sourceChainId_) internal {

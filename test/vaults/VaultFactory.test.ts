@@ -5,6 +5,7 @@ import { Reverter } from "@test-helpers";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
 import { expect } from "chai";
+import { ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
 
 describe("VaultFactory", () => {
@@ -85,6 +86,11 @@ describe("VaultFactory", () => {
       },
       sigSubscriptionInitData: {
         subscriptionSigner: SUBSCRIPTION_SIGNER,
+      },
+      crossChainInitData: {
+        subscriptionsSMTMaxDepth: 80,
+        subscriptionsSynchronizer: ZeroAddress,
+        targetChains: [100],
       },
     });
 

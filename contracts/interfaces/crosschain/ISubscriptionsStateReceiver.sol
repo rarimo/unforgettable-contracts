@@ -3,10 +3,10 @@ pragma solidity ^0.8.28;
 
 import {IWormholeReceiver} from "@wormhole/interfaces/IWormholeRelayer.sol";
 
-interface ISubscriptionStateReceiver is IWormholeReceiver {
-    struct SubscriptionStateReceiverInitData {
+interface ISubscriptionsStateReceiver is IWormholeReceiver {
+    struct SubscriptionsStateReceiverInitData {
         address wormholeRelayer;
-        address subscriptionStateSynchronizer;
+        address subscriptionsSynchronizer;
         uint16 sourceChainId;
     }
 }

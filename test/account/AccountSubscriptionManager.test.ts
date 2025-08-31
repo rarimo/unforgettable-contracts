@@ -6,6 +6,7 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 import { expect } from "chai";
+import { ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
 
 import { getBuySubscriptionSignature } from "../helpers/sign-utils";
@@ -80,6 +81,11 @@ describe("AccountSubscriptionManager", () => {
       sigSubscriptionInitData: {
         subscriptionSigner: SUBSCRIPTION_SIGNER,
       },
+      crossChainInitData: {
+        subscriptionsSMTMaxDepth: 80,
+        subscriptionsSynchronizer: ZeroAddress,
+        targetChains: [100],
+      },
     });
 
     await paymentToken.mint(FIRST, initialTokensAmount);
@@ -139,6 +145,11 @@ describe("AccountSubscriptionManager", () => {
           sigSubscriptionInitData: {
             subscriptionSigner: SUBSCRIPTION_SIGNER,
           },
+          crossChainInitData: {
+            subscriptionsSMTMaxDepth: 80,
+            subscriptionsSynchronizer: ZeroAddress,
+            targetChains: [100],
+          },
         }),
       )
         .to.be.revertedWithCustomError(subscriptionManager, "OnlyDeployer")
@@ -160,6 +171,11 @@ describe("AccountSubscriptionManager", () => {
           sigSubscriptionInitData: {
             subscriptionSigner: SUBSCRIPTION_SIGNER,
           },
+          crossChainInitData: {
+            subscriptionsSMTMaxDepth: 80,
+            subscriptionsSynchronizer: ZeroAddress,
+            targetChains: [100],
+          },
         }),
       ).to.be.revertedWithCustomError(subscriptionManager, "InvalidInitialization");
     });
@@ -178,6 +194,11 @@ describe("AccountSubscriptionManager", () => {
           },
           {
             subscriptionSigner: SUBSCRIPTION_SIGNER,
+          },
+          {
+            subscriptionsSMTMaxDepth: 80,
+            subscriptionsSynchronizer: ZeroAddress,
+            targetChains: [100],
           },
         ),
       ).to.be.revertedWithCustomError(subscriptionManager, "NotInitializing");

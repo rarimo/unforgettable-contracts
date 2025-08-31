@@ -6,7 +6,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import {ICrossChainModule} from "../../../interfaces/core/subscription/ICrossChainModule.sol";
-import {ISubscriptionSynchronizer} from "../../../interfaces/crosschain/ISubscriptionSynchronizer.sol";
+import {ISubscriptionsSynchronizer} from "../../../interfaces/crosschain/ISubscriptionsSynchronizer.sol";
 
 import {BaseSubscriptionModule} from "./BaseSubscriptionModule.sol";
 
@@ -16,14 +16,11 @@ contract CrossChainModule is ICrossChainModule, BaseSubscriptionModule, Initiali
     bytes32 private constant CROSS_CHAIN_MODULE_STORAGE_SLOT =
         keccak256("unforgettable.contract.cross.chain.module.storage");
 
+    event SubscriptionSynchronizerUpdated(address indexed subscriptionSynchronizer);
+
     struct CrossChainModuleStorage {
-        ISubscriptionSynchronizer subscriptionSynchronizer;
-        EnumerableSet.UintSet targetChains;
+        ISubscriptionsSynchronizer subscriptionsSynchronizer;
     }
-
-    event TargetChainAdded(uint16 targetChain);
-
-    error ChainNotSupported(uint16 chainId);
 
     function _getCrossChainModuleStorage()
         private
@@ -40,40 +37,32 @@ contract CrossChainModule is ICrossChainModule, BaseSubscriptionModule, Initiali
     function __CrossChainModule_init(
         CrossChainModuleInitData calldata initData_
     ) public onlyInitializing {
-        _updateSubscriptionSynchronizer(initData_.subscriptionSynchronizer);
-
-        for (uint256 i = 0; i < initData_.targetChains.length; ++i) {
-            _addTargetChain(initData_.targetChains[i]);
-        }
+        _setSubscriptionSynchronizer(initData_.subscriptionsSynchronizer);
     }
 
-    function syncSubscriptionState(uint16 targetChain_) public {
-        _syncSubscriptionState(targetChain_);
-    }
-
-    function isChainSupported(uint16 targetChain_) public view returns (bool) {
-        return _getCrossChainModuleStorage().targetChains.contains(targetChain_);
-    }
-
-    function supportedChains() public view returns (uint256[] memory) {
-        return _getCrossChainModuleStorage().targetChains.values();
-    }
-
-    function _syncSubscriptionState(uint16 targetChain_) internal {
-        require(isChainSupported(targetChain_), ChainNotSupported(targetChain_));
-
-        _getCrossChainModuleStorage().subscriptionSynchronizer.sync(targetChain_);
-    }
-
-    function _updateSubscriptionSynchronizer(address subscriptionSynchronizer_) internal {
+    function _setSubscriptionSynchronizer(address subscriptionSynchronizer_) internal {
         _checkAddress(subscriptionSynchronizer_, "SubscriptionSynchronizer");
 
-        _getCrossChainModuleStorage().subscriptionSynchronizer = ISubscriptionSynchronizer(
+        _getCrossChainModuleStorage().subscriptionsSynchronizer = ISubscriptionsSynchronizer(
             subscriptionSynchronizer_
         );
     }
 
-    function _addTargetChain(uint16 targetChain_) internal {
-        _getCrossChainModuleStorage().targetChains.add(targetChain_);
+    function _extendSubscription(
+        address account_,
+        uint64 duration_
+    ) internal virtual override(BaseSubscriptionModule) {
+        super._extendSubscription(account_, duration_);
+
+        uint64 _subscriptionStartTime = getSubscriptionStartTime(account_);
+        uint64 _subscriptionEndTime = getSubscriptionEndTime(account_);
+        bool _isNewSubscription = _subscriptionStartTime == uint64(block.timestamp);
+
+        _getCrossChainModuleStorage().subscriptionsSynchronizer.saveSubscriptionData(
+            account_,
+            _subscriptionStartTime,
+            _subscriptionEndTime,
+            _isNewSubscription
+        );
     }
 }

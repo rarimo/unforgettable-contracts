@@ -62,20 +62,6 @@ library TokensHelper {
     }
 
     /**
-     * @notice A function to send the exact amount of tokens to the provided address.
-     * @dev Reverts if balance is insufficient.
-     * @param tokenAddr_ The token address (`ETH_ADDR` for native ETH).
-     * @param to_ The recipient address.
-     * @param amount_ The requested amount to send.
-     */
-    function sendTokensStrict(address tokenAddr_, address to_, uint256 amount_) internal {
-        uint256 currentBalance_ = getSelfBalance(tokenAddr_);
-        require(currentBalance_ >= amount_, NotEnoughTokens(tokenAddr_, amount_, currentBalance_));
-
-        _sendTokens(tokenAddr_, to_, amount_);
-    }
-
-    /**
      * @notice A function to retrieve the balance of this contract for the provided token.
      * @param tokenAddr_ The token address (`ETH_ADDR` for native ETH).
      * @return The balance held by this contract.

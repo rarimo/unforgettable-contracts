@@ -23,22 +23,27 @@ contract BaseSubscriptionModule is IBaseSubscriptionModule {
         }
     }
 
+    /// @inheritdoc IBaseSubscriptionModule
     function hasSubscription(address account_) public view virtual returns (bool) {
         return getSubscriptionStartTime(account_) > 0;
     }
 
+    /// @inheritdoc IBaseSubscriptionModule
     function hasActiveSubscription(address account_) public view virtual returns (bool) {
         return block.timestamp < getSubscriptionEndTime(account_);
     }
 
+    /// @inheritdoc IBaseSubscriptionModule
     function hasSubscriptionDebt(address account_) public view virtual returns (bool) {
         return !hasActiveSubscription(account_) && hasSubscription(account_);
     }
 
+    /// @inheritdoc IBaseSubscriptionModule
     function getSubscriptionStartTime(address account_) public view virtual returns (uint64) {
         return _getAccountSubscriptionData(account_).startTime;
     }
 
+    /// @inheritdoc IBaseSubscriptionModule
     function getSubscriptionEndTime(address account_) public view virtual returns (uint64) {
         if (!hasSubscription(account_)) {
             return uint64(block.timestamp);

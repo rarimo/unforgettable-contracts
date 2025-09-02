@@ -22,7 +22,7 @@ contract SubscriptionsSynchronizer is
     using SparseMerkleTree for SparseMerkleTree.Bytes32SMT;
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    uint256 constant GAS_LIMIT = 50000; // Adjust the gas limit as needed
+    uint256 constant GAS_LIMIT = 50_000; // Adjust the gas limit as needed
 
     bytes32 public constant SUBSCRIPTIONS_SYNCHRONIZER_STORAGE_SLOT =
         keccak256("unforgettable.contract.subscriptions.synchronizer.storage");
@@ -32,6 +32,8 @@ contract SubscriptionsSynchronizer is
         SparseMerkleTree.Bytes32SMT subscriptionsSMT;
         EnumerableSet.AddressSet subscriptionManagers;
         mapping(uint16 chainId => address) targetAddresses;
+        mapping(uint16 chainId => uint256) lastSyncTimestamps;
+        mapping(uint16 chainId => uint256) lastTreeUpdateTimestamps;
     }
 
     event WormholeRelayerUpdated(address indexed relayer);
@@ -49,7 +51,7 @@ contract SubscriptionsSynchronizer is
 
     modifier onlySubscriptionManager() {
         require(
-            _getSSSStorage().subscriptionManagers.contains(msg.sender),
+            _getSSStorage().subscriptionManagers.contains(msg.sender),
             NotSubscriptionManager()
         );
 
@@ -60,7 +62,7 @@ contract SubscriptionsSynchronizer is
         _disableInitializers();
     }
 
-    function _getSSSStorage() private pure returns (SubscriptionSynchronizerStorage storage _sss) {
+    function _getSSStorage() private pure returns (SubscriptionSynchronizerStorage storage _sss) {
         bytes32 slot_ = SUBSCRIPTIONS_SYNCHRONIZER_STORAGE_SLOT;
 
         assembly ("memory-safe") {
@@ -88,22 +90,8 @@ contract SubscriptionsSynchronizer is
         }
     }
 
-    function getSubscriptionsSMTRoot() public view returns (bytes32) {
-        return _getSSSStorage().subscriptionsSMT.getRoot();
-    }
-
-    function getSubscriptionsSMTProof(
-        address subscriptionManager_,
-        address account_
-    ) public view returns (SparseMerkleTree.Proof memory) {
-        return
-            _getSSSStorage().subscriptionsSMT.getProof(
-                keccak256(abi.encode(subscriptionManager_, account_))
-            );
-    }
-
     function sync(uint16 targetChain_) external payable {
-        SubscriptionSynchronizerStorage storage $ = _getSSSStorage();
+        SubscriptionSynchronizerStorage storage $ = _getSSStorage();
 
         address _targetAddress = $.targetAddresses[targetChain_];
 
@@ -122,6 +110,8 @@ contract SubscriptionsSynchronizer is
             0, // No receiver value needed
             GAS_LIMIT // Gas limit for the transaction
         );
+
+        $.lastSyncTimestamps[targetChain_] = block.timestamp;
     }
 
     function updateWormholeRelayer(address wormholeRelayer_) public onlyOwner {
@@ -168,10 +158,12 @@ contract SubscriptionsSynchronizer is
         } else {
             _updateSMTNode(_key, _value);
         }
+
+        _getSSStorage().lastTreeUpdateTimestamps[uint16(block.chainid)] = block.timestamp;
     }
 
     function quoteCrossChainCost(uint16 targetChain_) public view returns (uint256 _cost) {
-        (_cost, ) = _getSSSStorage().wormholeRelayer.quoteEVMDeliveryPrice(
+        (_cost, ) = _getSSStorage().wormholeRelayer.quoteEVMDeliveryPrice(
             targetChain_,
             0,
             GAS_LIMIT
@@ -179,27 +171,41 @@ contract SubscriptionsSynchronizer is
     }
 
     function isChainSupported(uint16 chainId_) public view returns (bool) {
-        return _getSSSStorage().targetAddresses[chainId_] != address(0);
+        return _getSSStorage().targetAddresses[chainId_] != address(0);
+    }
+
+    function getSubscriptionsSMTRoot() public view returns (bytes32) {
+        return _getSSStorage().subscriptionsSMT.getRoot();
+    }
+
+    function getSubscriptionsSMTProof(
+        address subscriptionManager_,
+        address account_
+    ) public view returns (SparseMerkleTree.Proof memory) {
+        return
+            _getSSStorage().subscriptionsSMT.getProof(
+                keccak256(abi.encode(subscriptionManager_, account_))
+            );
     }
 
     function _initializeSubscriptionsSMT(uint32 maxDepth_) internal {
-        _getSSSStorage().subscriptionsSMT.initialize(maxDepth_);
+        _getSSStorage().subscriptionsSMT.initialize(maxDepth_);
     }
 
     function _updateWormholeRelayer(address wormholeRelayer_) internal {
         _checkAddress(wormholeRelayer_, "WormholeRelayer");
 
-        _getSSSStorage().wormholeRelayer = IWormholeRelayer(wormholeRelayer_);
+        _getSSStorage().wormholeRelayer = IWormholeRelayer(wormholeRelayer_);
     }
 
     function _addSubscriptionManager(address subscriptionManager_) internal {
         _checkAddress(subscriptionManager_, "SubscriptionManager");
 
-        _getSSSStorage().subscriptionManagers.add(subscriptionManager_);
+        _getSSStorage().subscriptionManagers.add(subscriptionManager_);
     }
 
     function _addDestination(Destination calldata destination_) internal {
-        SubscriptionSynchronizerStorage storage $ = _getSSSStorage();
+        SubscriptionSynchronizerStorage storage $ = _getSSStorage();
 
         uint16 _chainId = destination_.chainId;
         address _targetAddress = destination_.targetAddress;
@@ -217,13 +223,13 @@ contract SubscriptionsSynchronizer is
     function _removeSubscriptionManager(address subscriptionManager_) internal {
         _checkAddress(subscriptionManager_, "SubscriptionManager");
 
-        _getSSSStorage().subscriptionManagers.remove(subscriptionManager_);
+        _getSSStorage().subscriptionManagers.remove(subscriptionManager_);
     }
 
     function _removeDestination(uint16 chainId_) internal {
         require(chainId_ != 0 && chainId_ != block.chainid, InvalidChainId(chainId_));
 
-        SubscriptionSynchronizerStorage storage $ = _getSSSStorage();
+        SubscriptionSynchronizerStorage storage $ = _getSSStorage();
 
         address _targetAddress = $.targetAddresses[chainId_];
 
@@ -247,10 +253,10 @@ contract SubscriptionsSynchronizer is
     }
 
     function _addSMTNode(bytes32 key_, bytes32 value_) internal {
-        _getSSSStorage().subscriptionsSMT.add(key_, value_);
+        _getSSStorage().subscriptionsSMT.add(key_, value_);
     }
 
     function _updateSMTNode(bytes32 key_, bytes32 value_) internal {
-        _getSSSStorage().subscriptionsSMT.update(key_, value_);
+        _getSSStorage().subscriptionsSMT.update(key_, value_);
     }
 }

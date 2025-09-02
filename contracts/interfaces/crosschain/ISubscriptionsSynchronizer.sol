@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-interface ISubscriptionsSynchronizer {
+import {IMessanger} from "./IMessanger.sol";
+
+interface ISubscriptionsSynchronizer is IMessanger {
     struct SubscriptionsSynchronizerInitData {
         address wormholeRelayer;
         address[] subscriptionManagers;
@@ -11,11 +13,6 @@ interface ISubscriptionsSynchronizer {
     struct Destination {
         uint16 chainId;
         address targetAddress;
-    }
-
-    struct SyncMessage {
-        uint256 syncTimestamp;
-        bytes32 subscriptionsSMTRoot;
     }
 
     function sync(uint16 targetChain_) external payable;

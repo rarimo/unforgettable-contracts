@@ -11,5 +11,21 @@ interface ISubscriptionsStateReceiver is IWormholeReceiver, IMessanger {
         uint16 sourceChainId;
     }
 
+    event MessageReceived(bytes message);
+    event WormholeRelayerUpdated(address indexed relayer);
+    event SubscriptionsSynchronizerUpdated(address indexed synchronizer);
+    event SourceChainIdUpdated(uint16 indexed chainId);
+
+    error NotWormholeRelayer(address);
+    error InvalidSourceChainId();
+    error InvalidSourceAddress();
+    error OutdatedSyncMessage();
+
+    function updateWormholeRelayer(address wormholeRelayer_) external;
+
+    function updateSubscriptionsSynchronizer(address subscriptionStateSynchronizer_) external;
+
+    function updateSourceChainId(uint16 sourceChainId_) external;
+
     function rootInHistory(bytes32 smtRoot_) external view returns (bool);
 }

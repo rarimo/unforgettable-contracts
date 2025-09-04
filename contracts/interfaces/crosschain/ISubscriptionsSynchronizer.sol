@@ -15,6 +15,18 @@ interface ISubscriptionsSynchronizer is IMessanger {
         address targetAddress;
     }
 
+    event WormholeRelayerUpdated(address indexed relayer);
+    event SubscriptionManagerAdded(address indexed subscriptionManager);
+    event SubscriptionManagerRemoved(address indexed subscriptionManager);
+    event DestinationAdded(uint16 indexed chainId, address indexed targetAddress);
+    event DestinationRemoved(uint16 indexed chainId);
+
+    error NotSubscriptionManager();
+    error InsufficientFundsForCrossChainDelivery();
+    error ChainNotSupported(uint16 chainId);
+    error InvalidChainId(uint16 chainId);
+    error DestinationAlreadyExists(uint16 chainId, address targetAddress);
+
     function sync(uint16 targetChain_) external payable;
 
     function saveSubscriptionData(
@@ -31,4 +43,13 @@ interface ISubscriptionsSynchronizer is IMessanger {
     function addDestination(Destination calldata destination_) external;
 
     function removeDestination(uint16 chainId_) external;
+
+    function getSubscriptionsSMTRoot() external view returns (bytes32 smtRoot_);
+
+    function getSubscriptionsSMTProof(
+        address subscriptionManager_,
+        address account_
+    ) external view returns (bytes32[] memory proof_);
+
+    function isChainSupported(uint16 chainId_) external view returns (bool);
 }

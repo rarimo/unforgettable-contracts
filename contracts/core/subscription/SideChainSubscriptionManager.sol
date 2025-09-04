@@ -2,42 +2,28 @@
 pragma solidity ^0.8.28;
 
 import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {MerkleProof} from "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-
-import {SparseMerkleTree} from "@solarity/solidity-lib/libs/data-structures/SparseMerkleTree.sol";
 
 import {ISideChainSubscriptionManager} from "../../interfaces/core/ISideChainSubscriptionManager.sol";
 import {ISubscriptionsStateReceiver} from "../../interfaces/crosschain/ISubscriptionsStateReceiver.sol";
+import {BaseSubscriptionModule} from "./modules/BaseSubscriptionModule.sol";
 
 contract SideChainSubscriptionManager is
     ISideChainSubscriptionManager,
+    BaseSubscriptionModule,
     OwnableUpgradeable,
     PausableUpgradeable,
     UUPSUpgradeable
 {
-    using MerkleProof for bytes32[];
-
     bytes32 private constant SIDECHAIN_SUBSCRIPTION_MANAGER_STORAGE_SLOT =
         keccak256("unforgettable.contract.sidechain.subscription.manager.storage");
 
     struct SideChainSubscriptionManagerStorage {
         ISubscriptionsStateReceiver subscriptionsStateReceiver;
         address sourceSubscriptionManager;
-        mapping(address => AccountSubscriptionData) accountsSubscriptionData;
     }
-
-    event SubscriptionSynced(address indexed account, uint64 startTime, uint64 endTime);
-    event SubscriptionsStateReceiverUpdated(address indexed subscriptionsStateReceiver);
-    event SourceSubscriptionManagerUpdated(address indexed sourceSubscriptionManager);
-
-    error UknownRoot(bytes32 root);
-    error InvalidSMTKey();
-    error InvalidSMTValue();
-    error InvalidSMTProof();
 
     function _getSideChainSubscriptionManagerStorage()
         private
@@ -84,9 +70,43 @@ contract SideChainSubscriptionManager is
 
     function syncSubscription(
         address account_,
-        AccountSubscriptionData calldata subscriptionData,
+        AccountSubscriptionData calldata subscriptionData_,
         bytes32[] calldata proof_
     ) public virtual {
+        _verifyProof(account_, subscriptionData_, proof_);
+
+        _setStartTime(account_, subscriptionData_.startTime);
+        _setEndTime(account_, subscriptionData_.endTime);
+
+        emit SubscriptionSynced(account_, subscriptionData_.startTime, subscriptionData_.endTime);
+    }
+
+    function implementation() external view returns (address) {
+        return ERC1967Utils.getImplementation();
+    }
+
+    function _setSubscriptionsStateReceiver(address subscriptionsStateReceiver_) internal {
+        _checkAddress(subscriptionsStateReceiver_, "SubscriptionsStateReceiver");
+
+        _getSideChainSubscriptionManagerStorage()
+            .subscriptionsStateReceiver = ISubscriptionsStateReceiver(subscriptionsStateReceiver_);
+    }
+
+    function _setSourceSubscriptionManager(address sourceSubscriptionManager_) internal {
+        _checkAddress(sourceSubscriptionManager_, "SourceSubscriptionManager");
+
+        _getSideChainSubscriptionManagerStorage()
+            .sourceSubscriptionManager = sourceSubscriptionManager_;
+    }
+
+    // solhint-disable-next-line no-empty-blocks
+    function _authorizeUpgrade(address newImplementation_) internal override onlyOwner {}
+
+    function _verifyProof(
+        address account_,
+        AccountSubscriptionData calldata subscriptionData,
+        bytes32[] calldata proof_
+    ) internal view {
         SideChainSubscriptionManagerStorage storage $ = _getSideChainSubscriptionManagerStorage();
 
         bytes32 key_ = keccak256(abi.encode($.sourceSubscriptionManager, account_));
@@ -121,65 +141,6 @@ contract SideChainSubscriptionManager is
             $.subscriptionsStateReceiver.rootInHistory(computedHash_),
             UknownRoot(computedHash_)
         );
-
-        $.accountsSubscriptionData[account_] = subscriptionData;
-
-        emit SubscriptionSynced(account_, subscriptionData.startTime, subscriptionData.endTime);
-    }
-
-    function implementation() external view returns (address) {
-        return ERC1967Utils.getImplementation();
-    }
-
-    function hasSubscription(address account_) public view virtual returns (bool) {
-        return getSubscriptionStartTime(account_) > 0;
-    }
-
-    function hasActiveSubscription(address account_) public view virtual returns (bool) {
-        return block.timestamp < getSubscriptionEndTime(account_);
-    }
-
-    function hasSubscriptionDebt(address account_) public view virtual returns (bool) {
-        return !hasActiveSubscription(account_) && hasSubscription(account_);
-    }
-
-    function getSubscriptionStartTime(address account_) public view virtual returns (uint64) {
-        return _getAccountSubscriptionData(account_).startTime;
-    }
-
-    function getSubscriptionEndTime(address account_) public view virtual returns (uint64) {
-        if (!hasSubscription(account_)) {
-            return uint64(block.timestamp);
-        }
-
-        return _getAccountSubscriptionData(account_).endTime;
-    }
-
-    function _setSubscriptionsStateReceiver(address subscriptionsStateReceiver_) internal {
-        _checkAddress(subscriptionsStateReceiver_, "SubscriptionsStateReceiver");
-
-        SideChainSubscriptionManagerStorage storage $ = _getSideChainSubscriptionManagerStorage();
-        $.subscriptionsStateReceiver = ISubscriptionsStateReceiver(subscriptionsStateReceiver_);
-    }
-
-    function _setSourceSubscriptionManager(address sourceSubscriptionManager_) internal {
-        _checkAddress(sourceSubscriptionManager_, "SourceSubscriptionManager");
-
-        SideChainSubscriptionManagerStorage storage $ = _getSideChainSubscriptionManagerStorage();
-        $.sourceSubscriptionManager = sourceSubscriptionManager_;
-    }
-
-    // solhint-disable-next-line no-empty-blocks
-    function _authorizeUpgrade(address newImplementation_) internal override onlyOwner {}
-
-    function _checkAddress(address addr_, string memory fieldName_) internal pure {
-        require(addr_ != address(0), ZeroAddr(fieldName_));
-    }
-
-    function _getAccountSubscriptionData(
-        address account_
-    ) private view returns (AccountSubscriptionData storage) {
-        return _getSideChainSubscriptionManagerStorage().accountsSubscriptionData[account_];
     }
 
     function _hash2(bytes32 a_, bytes32 b_) private pure returns (bytes32 result_) {

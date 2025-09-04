@@ -8,10 +8,13 @@ import {SparseMerkleTree} from "@solarity/solidity-lib/libs/data-structures/Spar
 
 import {ISubscriptionsStateReceiver} from "../interfaces/crosschain/ISubscriptionsStateReceiver.sol";
 
+import {ZeroAddressChecker} from "../utils/ZeroAddressChecker.sol";
+
 contract SubscriptionsStateReceiver is
     ISubscriptionsStateReceiver,
     OwnableUpgradeable,
-    ADeployerGuard
+    ADeployerGuard,
+    ZeroAddressChecker
 {
     bytes32 public constant SUBSCRIPTIONS_STATE_RECEIVER_STORAGE_SLOT =
         keccak256("unforgettable.contract.subscriptions.receiver.storage");
@@ -22,17 +25,6 @@ contract SubscriptionsStateReceiver is
         address sourceSubscriptionsSynchronizer;
         mapping(bytes32 subscriptionsSMTRoot => uint256) SMTRootsHistory;
     }
-
-    event MessageReceived(bytes message);
-    event WormholeRelayerUpdated(address indexed relayer);
-    event SubscriptionsSynchronizerUpdated(address indexed synchronizer);
-    event SourceChainIdUpdated(uint16 indexed chainId);
-
-    error NotWormholeRelayer(address);
-    error ZeroAddr(string fieldName);
-    error InvalidSourceChainId();
-    error InvalidSourceAddress();
-    error OutdatedSyncMessage();
 
     modifier onlyWormholeRelayer() {
         require(
@@ -146,9 +138,5 @@ contract SubscriptionsStateReceiver is
 
     function _decodeMessage(bytes memory message_) internal pure returns (SyncMessage memory) {
         return abi.decode(message_, (SyncMessage));
-    }
-
-    function _checkAddress(address addr_, string memory fieldName_) internal pure {
-        require(addr_ != address(0), ZeroAddr(fieldName_));
     }
 }

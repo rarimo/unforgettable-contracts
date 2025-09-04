@@ -54,15 +54,13 @@ contract CrossChainModule is ICrossChainModule, BaseSubscriptionModule, Initiali
     ) internal virtual override(BaseSubscriptionModule) {
         super._extendSubscription(account_, duration_);
 
-        uint64 _subscriptionStartTime = getSubscriptionStartTime(account_);
-        uint64 _subscriptionEndTime = getSubscriptionEndTime(account_);
-        bool _isNewSubscription = _subscriptionStartTime == uint64(block.timestamp);
+        uint64 subscriptionStartTime_ = getSubscriptionStartTime(account_);
 
         _getCrossChainModuleStorage().subscriptionsSynchronizer.saveSubscriptionData(
             account_,
-            _subscriptionStartTime,
-            _subscriptionEndTime,
-            _isNewSubscription
+            subscriptionStartTime_,
+            getSubscriptionEndTime(account_),
+            subscriptionStartTime_ == uint64(block.timestamp)
         );
     }
 }

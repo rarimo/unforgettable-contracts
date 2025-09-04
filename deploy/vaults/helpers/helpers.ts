@@ -12,5 +12,5 @@ export async function getVaultFactoryAddr(createXDeployer: ICreateX, signerAddr:
 }
 
 export function getVaultFactorySalt(signerAddr: string): string {
-  return `${signerAddr}001231231231231231232226`;
+  return `${signerAddr}00004e6f6e204f626c697461`;
 }

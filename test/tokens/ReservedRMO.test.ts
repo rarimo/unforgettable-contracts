@@ -10,6 +10,8 @@ import { ethers } from "hardhat";
 describe("ReservedRMO", () => {
   const reverter = new Reverter();
 
+  const defaultVaultName = "NewVaultName";
+
   const reservedTokensAmountPerAddress = wei(10000);
 
   let OWNER: SignerWithAddress;
@@ -177,7 +179,7 @@ describe("ReservedRMO", () => {
 
   describe("#mintReservedTokens", () => {
     it("should mint reserved tokens for a vault address", async () => {
-      await vaultFactory.setDeployedVault(FIRST, true);
+      await vaultFactory.setVaultName(FIRST, defaultVaultName);
 
       expect(await reservedRMO.getMintedAmount(FIRST)).to.equal(0);
       const tx = await reservedRMO.mintReservedTokens(FIRST);
@@ -192,7 +194,7 @@ describe("ReservedRMO", () => {
     });
 
     it("should get exception if try to mint tokens for the same vault again", async () => {
-      await vaultFactory.setDeployedVault(FIRST, true);
+      await vaultFactory.setVaultName(FIRST, defaultVaultName);
 
       await reservedRMO.mintReservedTokens(FIRST);
 
@@ -210,7 +212,7 @@ describe("ReservedRMO", () => {
 
   describe("#burnReservedTokens", () => {
     beforeEach(async () => {
-      await vaultFactory.setDeployedVault(FIRST, true);
+      await vaultFactory.setVaultName(FIRST, defaultVaultName);
 
       await reservedRMO.setRMOToken(RMO_TOKEN);
       await reservedRMO.mintReservedTokens(FIRST);
@@ -237,7 +239,7 @@ describe("ReservedRMO", () => {
 
   describe("#transfer", () => {
     beforeEach(async () => {
-      await vaultFactory.setDeployedVault(FIRST, true);
+      await vaultFactory.setVaultName(FIRST, defaultVaultName);
       await reservedRMO.mintReservedTokens(FIRST);
     });
 
@@ -269,7 +271,7 @@ describe("ReservedRMO", () => {
 
   describe("#transferFrom", () => {
     beforeEach(async () => {
-      await vaultFactory.setDeployedVault(FIRST, true);
+      await vaultFactory.setVaultName(FIRST, defaultVaultName);
       await reservedRMO.mintReservedTokens(FIRST);
 
       await reservedRMO.connect(FIRST).approve(SECOND, reservedTokensAmountPerAddress);

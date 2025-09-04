@@ -148,7 +148,14 @@ abstract contract BaseSubscriptionManager is
         address account_,
         address token_,
         uint64 duration_
-    ) public payable virtual override(TokensPaymentModule, ITokensPaymentModule) nonReentrant {
+    )
+        public
+        payable
+        virtual
+        override(TokensPaymentModule, ITokensPaymentModule)
+        nonReentrant
+        whenNotPaused
+    {
         super.buySubscription(account_, token_, duration_);
     }
 
@@ -156,7 +163,7 @@ abstract contract BaseSubscriptionManager is
         address vault_,
         address sbt_,
         uint256 tokenId_
-    ) public virtual override(SBTPaymentModule, ISBTPaymentModule) nonReentrant {
+    ) public virtual override(SBTPaymentModule, ISBTPaymentModule) nonReentrant whenNotPaused {
         super.buySubscriptionWithSBT(vault_, sbt_, tokenId_);
     }
 
@@ -169,6 +176,7 @@ abstract contract BaseSubscriptionManager is
         virtual
         override(SignatureSubscriptionModule, ISignatureSubscriptionModule)
         nonReentrant
+        whenNotPaused
     {
         super.buySubscriptionWithSignature(vault_, duration_, signature_);
     }

@@ -85,28 +85,42 @@ contract SideChainSubscriptionManager is
     function syncSubscription(
         address account_,
         AccountSubscriptionData calldata subscriptionData,
-        SparseMerkleTree.Proof calldata proof_
+        bytes32[] calldata proof_
     ) public virtual {
         SideChainSubscriptionManagerStorage storage $ = _getSideChainSubscriptionManagerStorage();
 
-        require($.subscriptionsStateReceiver.rootInHistory(proof_.root), UknownRoot(proof_.root));
-        require(
-            proof_.key == keccak256(abi.encode($.sourceSubscriptionManager, account_)),
-            InvalidSMTKey()
+        bytes32 key_ = keccak256(abi.encode($.sourceSubscriptionManager, account_));
+        bytes32 value_ = keccak256(
+            abi.encode(
+                $.sourceSubscriptionManager,
+                account_,
+                subscriptionData.startTime,
+                subscriptionData.endTime
+            )
         );
+
+        bytes32 computedHash_ = _hash3(key_, value_, bytes32(uint256(1)));
+        uint256 pathIndex_ = uint256(key_);
+        uint256 depth_ = proof_.length;
+
+        while (depth_ > 0 && proof_[depth_ - 1] == bytes32(0)) {
+            --depth_;
+        }
+
+        for (uint256 i = depth_; i > 0; --i) {
+            uint256 sIndex_ = i - 1;
+
+            if ((pathIndex_ >> sIndex_) & 1 == 1) {
+                computedHash_ = _hash2(proof_[sIndex_], computedHash_);
+            } else {
+                computedHash_ = _hash2(computedHash_, proof_[sIndex_]);
+            }
+        }
+
         require(
-            proof_.value ==
-                keccak256(
-                    abi.encode(
-                        $.sourceSubscriptionManager,
-                        account_,
-                        subscriptionData.startTime,
-                        subscriptionData.endTime
-                    )
-                ),
-            InvalidSMTValue()
+            $.subscriptionsStateReceiver.rootInHistory(computedHash_),
+            UknownRoot(computedHash_)
         );
-        require(proof_.siblings.verify(proof_.root, proof_.value), InvalidSMTProof());
 
         $.accountsSubscriptionData[account_] = subscriptionData;
 
@@ -166,5 +180,26 @@ contract SideChainSubscriptionManager is
         address account_
     ) private view returns (AccountSubscriptionData storage) {
         return _getSideChainSubscriptionManagerStorage().accountsSubscriptionData[account_];
+    }
+
+    function _hash2(bytes32 a_, bytes32 b_) private pure returns (bytes32 result_) {
+        assembly {
+            mstore(0, a_)
+            mstore(32, b_)
+
+            result_ := keccak256(0, 64)
+        }
+    }
+
+    function _hash3(bytes32 a_, bytes32 b_, bytes32 c) private pure returns (bytes32 result_) {
+        assembly {
+            let freePtr_ := mload(64)
+
+            mstore(freePtr_, a_)
+            mstore(add(freePtr_, 32), b_)
+            mstore(add(freePtr_, 64), c)
+
+            result_ := keccak256(freePtr_, 96)
+        }
     }
 }

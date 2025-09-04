@@ -51,8 +51,6 @@ interface IRecoveryManager is IRecoveryProvider {
     event StrategyDisabled(uint256 indexed strategyId);
     event StrategyEnabled(uint256 indexed strategyId);
 
-    function subscriptionManagerExists(address subscriptionManager_) external view returns (bool);
-
     function resubscribe(bytes memory recoveryData_) external payable;
 
     function getRecoveryMethods(

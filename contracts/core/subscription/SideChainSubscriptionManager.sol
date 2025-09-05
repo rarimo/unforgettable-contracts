@@ -68,7 +68,7 @@ contract SideChainSubscriptionManager is
         address account_,
         AccountSubscriptionData calldata subscriptionData_,
         bytes32[] calldata proof_
-    ) public virtual {
+    ) public virtual whenNotPaused {
         _verifyProof(account_, subscriptionData_, proof_);
 
         _setStartTime(account_, subscriptionData_.startTime);

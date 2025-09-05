@@ -25,6 +25,7 @@ contract SubscriptionsSynchronizer is
 {
     using SparseMerkleTree for SparseMerkleTree.Bytes32SMT;
     using EnumerableSet for EnumerableSet.AddressSet;
+    using Address for address;
 
     bytes32 public constant SUBSCRIPTIONS_SYNCHRONIZER_STORAGE_SLOT =
         keccak256("unforgettable.contract.subscriptions.synchronizer.storage");
@@ -96,6 +97,7 @@ contract SubscriptionsSynchronizer is
 
         if (excess_ > 0) {
             Address.sendValue(payable(msg.sender), excess_);
+            //address(msg.sender).sendValue(excess_);
         }
 
         emit SyncInitiated(block.timestamp);

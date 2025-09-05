@@ -5,6 +5,7 @@ import {ERC1967Utils} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Utils.s
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import {ISideChainSubscriptionManager} from "../../interfaces/core/ISideChainSubscriptionManager.sol";
 import {ISubscriptionsStateReceiver} from "../../interfaces/crosschain/ISubscriptionsStateReceiver.sol";
@@ -14,6 +15,7 @@ contract SideChainSubscriptionManager is
     ISideChainSubscriptionManager,
     BaseSubscriptionModule,
     OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
     PausableUpgradeable,
     UUPSUpgradeable
 {
@@ -68,7 +70,7 @@ contract SideChainSubscriptionManager is
         address account_,
         AccountSubscriptionData calldata subscriptionData_,
         bytes32[] calldata proof_
-    ) public virtual whenNotPaused {
+    ) public virtual whenNotPaused nonReentrant {
         _verifyProof(account_, subscriptionData_, proof_);
 
         _setStartTime(account_, subscriptionData_.startTime);

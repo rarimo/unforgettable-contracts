@@ -13,7 +13,7 @@ interface ISideChainSubscriptionManager is IBaseSubscriptionModule {
     event SubscriptionsStateReceiverUpdated(address indexed subscriptionsStateReceiver);
     event SourceSubscriptionManagerUpdated(address indexed sourceSubscriptionManager);
 
-    error UknownRoot(bytes32 root);
+    error UnkownRoot(bytes32 root);
     error InvalidSMTKey();
     error InvalidSMTValue();
     error InvalidSMTProof();

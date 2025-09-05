@@ -139,7 +139,7 @@ contract SideChainSubscriptionManager is
 
         require(
             $.subscriptionsStateReceiver.rootInHistory(computedHash_),
-            UknownRoot(computedHash_)
+            UnkownRoot(computedHash_)
         );
     }
 

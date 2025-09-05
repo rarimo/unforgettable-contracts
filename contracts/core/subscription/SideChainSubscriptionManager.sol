@@ -50,14 +50,10 @@ contract SideChainSubscriptionManager is
         address subscriptionsStateReceiver_
     ) external onlyOwner {
         _setSubscriptionsStateReceiver(subscriptionsStateReceiver_);
-
-        emit SubscriptionsStateReceiverUpdated(subscriptionsStateReceiver_);
     }
 
     function setSourceSubscriptionManager(address sourceSubscriptionManager_) external onlyOwner {
         _setSourceSubscriptionManager(sourceSubscriptionManager_);
-
-        emit SourceSubscriptionManagerUpdated(sourceSubscriptionManager_);
     }
 
     function pause() public virtual onlyOwner {
@@ -90,6 +86,8 @@ contract SideChainSubscriptionManager is
 
         _getSideChainSubscriptionManagerStorage()
             .subscriptionsStateReceiver = ISubscriptionsStateReceiver(subscriptionsStateReceiver_);
+
+        emit SubscriptionsStateReceiverUpdated(subscriptionsStateReceiver_);
     }
 
     function _setSourceSubscriptionManager(address sourceSubscriptionManager_) internal {
@@ -97,6 +95,8 @@ contract SideChainSubscriptionManager is
 
         _getSideChainSubscriptionManagerStorage()
             .sourceSubscriptionManager = sourceSubscriptionManager_;
+
+        emit SourceSubscriptionManagerUpdated(sourceSubscriptionManager_);
     }
 
     // solhint-disable-next-line no-empty-blocks

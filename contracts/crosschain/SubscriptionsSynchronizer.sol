@@ -78,7 +78,7 @@ contract SubscriptionsSynchronizer is
 
         uint256 _cost = quoteCrossChainCost(targetChain_); // Dynamically calculate the cross-chain cost
 
-        require(msg.value >= _cost, InsufficientFundsForCrossChainDelivery());
+        require(msg.value == _cost, InsufficientFundsForCrossChainDelivery());
 
         bytes memory message_ = _constructMessage();
 

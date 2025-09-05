@@ -49,6 +49,7 @@ contract SBTPaymentModule is ISBTPaymentModule, BaseSubscriptionModule, Initiali
         }
     }
 
+    /// @inheritdoc ISBTPaymentModule
     function buySubscriptionWithSBT(
         address account_,
         address sbt_,
@@ -57,14 +58,17 @@ contract SBTPaymentModule is ISBTPaymentModule, BaseSubscriptionModule, Initiali
         _buySubscriptionWithSBT(account_, sbt_, msg.sender, tokenId_);
     }
 
+    /// @inheritdoc ISBTPaymentModule
     function getSupportedSBTs() public view returns (address[] memory) {
         return _getSBTPaymentModuleStorage().supportedSBTs.values();
     }
 
+    /// @inheritdoc ISBTPaymentModule
     function isSupportedSBT(address sbtToken_) public view virtual returns (bool) {
         return _getSBTPaymentModuleStorage().supportedSBTs.contains(sbtToken_);
     }
 
+    /// @inheritdoc ISBTPaymentModule
     function getSubscriptionDurationPerSBT(
         address sbtToken_
     ) public view virtual returns (uint64) {

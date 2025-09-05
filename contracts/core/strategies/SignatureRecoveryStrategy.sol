@@ -24,6 +24,7 @@ contract SignatureRecoveryStrategy is
         __ARecoveryStrategy_init(recoveryManagerAddr_);
     }
 
+    /// @inheritdoc ISignatureRecoveryStrategy
     function hashSignatureRecovery(
         address account_,
         bytes memory object_,

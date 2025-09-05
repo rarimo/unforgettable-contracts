@@ -43,6 +43,7 @@ contract Vault is IVault, NoncesUpgradeable, ReentrancyGuardUpgradeable, EIP712U
         }
     }
 
+    /// @inheritdoc IVault
     function initialize(address masterKey_) external initializer {
         __EIP712_init("Vault", "v1.0.0");
         __ReentrancyGuard_init();
@@ -59,6 +60,7 @@ contract Vault is IVault, NoncesUpgradeable, ReentrancyGuardUpgradeable, EIP712U
         deposit(TokensHelper.ETH_ADDR, msg.value);
     }
 
+    /// @inheritdoc IVault
     function updateMasterKey(address newMasterKey_, bytes memory signature_) external {
         bytes32 updateMasterKeyHash_ = hashUpdateMasterKey(newMasterKey_, _useNonce(owner()));
         owner().checkSignature(updateMasterKeyHash_, signature_);
@@ -66,6 +68,7 @@ contract Vault is IVault, NoncesUpgradeable, ReentrancyGuardUpgradeable, EIP712U
         _updateMasterKey(newMasterKey_);
     }
 
+    /// @inheritdoc IVault
     function updateEnabledStatus(bool enabled_, bytes memory signature_) external {
         VaultStorage storage $ = _getVaultStorage();
 
@@ -79,6 +82,7 @@ contract Vault is IVault, NoncesUpgradeable, ReentrancyGuardUpgradeable, EIP712U
         emit EnabledStatusUpdated(enabled_);
     }
 
+    /// @inheritdoc IVault
     function withdrawTokens(
         address tokenAddr_,
         address recipient_,
@@ -107,6 +111,7 @@ contract Vault is IVault, NoncesUpgradeable, ReentrancyGuardUpgradeable, EIP712U
         emit TokensWithdrawn(tokenAddr_, recipient_, tokensAmount_);
     }
 
+    /// @inheritdoc IVault
     function deposit(address tokenAddr_, uint256 amountToDeposit_) public payable nonReentrant {
         require(isVaultEnabled(), VaultIsNotEnabled());
         _checkTokensAmount(amountToDeposit_);
@@ -130,22 +135,27 @@ contract Vault is IVault, NoncesUpgradeable, ReentrancyGuardUpgradeable, EIP712U
         emit TokensDeposited(tokenAddr_, msg.sender, amountToDeposit_);
     }
 
+    /// @inheritdoc IVault
     function getBalance(address tokenAddr_) external view returns (uint256) {
         return tokenAddr_.getSelfBalance();
     }
 
+    /// @inheritdoc IVault
     function getVaultFactory() external view returns (address) {
         return address(_getVaultStorage().vaultFactory);
     }
 
+    /// @inheritdoc IVault
     function owner() public view returns (address) {
         return _getVaultStorage().masterKey;
     }
 
+    /// @inheritdoc IVault
     function isVaultEnabled() public view returns (bool) {
         return _getVaultStorage().enabled;
     }
 
+    /// @inheritdoc IVault
     function hashWithdrawTokens(
         address tokenAddr_,
         address recipient_,
@@ -160,6 +170,7 @@ contract Vault is IVault, NoncesUpgradeable, ReentrancyGuardUpgradeable, EIP712U
             );
     }
 
+    /// @inheritdoc IVault
     function hashUpdateEnabledStatus(bool enabled_, uint256 nonce_) public view returns (bytes32) {
         return
             _hashTypedDataV4(
@@ -167,6 +178,7 @@ contract Vault is IVault, NoncesUpgradeable, ReentrancyGuardUpgradeable, EIP712U
             );
     }
 
+    /// @inheritdoc IVault
     function hashUpdateMasterKey(
         address newMasterKey_,
         uint256 nonce_

@@ -55,22 +55,16 @@ contract SubscriptionsStateReceiver is
 
     function updateWormholeRelayer(address wormholeRelayer_) public onlyOwner {
         _updateWormholeRelayer(wormholeRelayer_);
-
-        emit WormholeRelayerUpdated(wormholeRelayer_);
     }
 
     function updateSubscriptionsSynchronizer(
-        address subscriptionStateSynchronizer_
+        address subscriptionsStateSynchronizer_
     ) public onlyOwner {
-        _updateSubscriptionsSynchronizer(subscriptionStateSynchronizer_);
-
-        emit SubscriptionsSynchronizerUpdated(subscriptionStateSynchronizer_);
+        _updateSubscriptionsSynchronizer(subscriptionsStateSynchronizer_);
     }
 
     function updateSourceChainId(uint16 sourceChainId_) public onlyOwner {
         _updateSourceChainId(sourceChainId_);
-
-        emit SourceChainIdUpdated(sourceChainId_);
     }
 
     function receiveWormholeMessages(
@@ -109,18 +103,24 @@ contract SubscriptionsStateReceiver is
         _checkAddress(wormholeRelayer_, "WormholeRelayer");
 
         _getSSRStorage().wormholeRelayer = wormholeRelayer_;
+
+        emit WormholeRelayerUpdated(wormholeRelayer_);
     }
 
     function _updateSubscriptionsSynchronizer(address subscriptionsSynchronizer_) internal {
         _checkAddress(subscriptionsSynchronizer_, "SubscriptionsSynchronizer");
 
         _getSSRStorage().sourceSubscriptionsSynchronizer = subscriptionsSynchronizer_;
+
+        emit SubscriptionsSynchronizerUpdated(subscriptionsSynchronizer_);
     }
 
     function _updateSourceChainId(uint16 sourceChainId_) internal {
         require(sourceChainId_ != 0 && sourceChainId_ != block.chainid, InvalidSourceChainId());
 
         _getSSRStorage().sourceChainId = sourceChainId_;
+
+        emit SourceChainIdUpdated(sourceChainId_);
     }
 
     function _processMessage(SyncMessage memory message_) internal {

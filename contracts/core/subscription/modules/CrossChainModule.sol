@@ -44,6 +44,8 @@ contract CrossChainModule is ICrossChainModule, BaseSubscriptionModule, Initiali
         _getCrossChainModuleStorage().subscriptionsSynchronizer = ISubscriptionsSynchronizer(
             subscriptionSynchronizer_
         );
+
+        emit SubscriptionSynchronizerUpdated(subscriptionSynchronizer_);
     }
 
     function _extendSubscription(

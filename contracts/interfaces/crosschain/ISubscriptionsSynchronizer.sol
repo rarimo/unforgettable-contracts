@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IMessanger} from "./IMessanger.sol";
+import {ISubscriptionMessanger} from "./ISubscriptionMessanger.sol";
 
-interface ISubscriptionsSynchronizer is IMessanger {
+interface ISubscriptionsSynchronizer is ISubscriptionMessanger {
     struct SubscriptionsSynchronizerInitData {
         address wormholeRelayer;
         address[] subscriptionManagers;

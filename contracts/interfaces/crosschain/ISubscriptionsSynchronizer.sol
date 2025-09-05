@@ -6,6 +6,7 @@ import {ISubscriptionMessanger} from "./ISubscriptionMessanger.sol";
 interface ISubscriptionsSynchronizer is ISubscriptionMessanger {
     struct SubscriptionsSynchronizerInitData {
         address wormholeRelayer;
+        uint32 SMTMaxDepth;
         address[] subscriptionManagers;
         Destination[] destinations;
     }

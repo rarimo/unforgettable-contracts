@@ -64,6 +64,7 @@ contract SubscriptionsSynchronizer is
         __Ownable_init(msg.sender);
 
         _updateWormholeRelayer(initData_.wormholeRelayer);
+        _initializeSubscriptionsSMT(initData_.SMTMaxDepth);
 
         address[] calldata subscriptionManagers_ = initData_.subscriptionManagers;
 

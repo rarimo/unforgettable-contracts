@@ -9,4 +9,6 @@ interface ICrossChainModule is IBaseSubscriptionModule {
         address subscriptionsSynchronizer;
         uint16[] targetChains;
     }
+
+    event SubscriptionSynchronizerUpdated(address indexed subscriptionSynchronizer);
 }

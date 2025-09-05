@@ -16,8 +16,6 @@ contract CrossChainModule is ICrossChainModule, BaseSubscriptionModule, Initiali
     bytes32 private constant CROSS_CHAIN_MODULE_STORAGE_SLOT =
         keccak256("unforgettable.contract.cross.chain.module.storage");
 
-    event SubscriptionSynchronizerUpdated(address indexed subscriptionSynchronizer);
-
     struct CrossChainModuleStorage {
         ISubscriptionsSynchronizer subscriptionsSynchronizer;
     }

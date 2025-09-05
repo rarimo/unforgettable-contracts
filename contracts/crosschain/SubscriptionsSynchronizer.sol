@@ -36,15 +36,6 @@ contract SubscriptionsSynchronizer is
         mapping(uint16 chainId => address) targetAddresses;
     }
 
-    modifier onlySubscriptionManager() {
-        require(
-            _getSSStorage().subscriptionManagers.contains(msg.sender),
-            NotSubscriptionManager()
-        );
-
-        _;
-    }
-
     constructor() ADeployerGuard(msg.sender) {
         _disableInitializers();
     }
@@ -135,7 +126,9 @@ contract SubscriptionsSynchronizer is
         uint64 startTime_,
         uint64 endTime_,
         bool isNewSubscription_
-    ) public onlySubscriptionManager {
+    ) public {
+        _authSubscriptionManager();
+
         bytes32 key_ = _key(msg.sender, account_);
         bytes32 value_ = _value(msg.sender, account_, startTime_, endTime_);
 
@@ -238,6 +231,13 @@ contract SubscriptionsSynchronizer is
 
     function _updateSMTNode(bytes32 key_, bytes32 value_) internal {
         _getSSStorage().subscriptionsSMT.update(key_, value_);
+    }
+
+    function _authSubscriptionManager() private view {
+        require(
+            _getSSStorage().subscriptionManagers.contains(msg.sender),
+            NotSubscriptionManager()
+        );
     }
 
     function _key(address subscriptionManager_, address account_) private pure returns (bytes32) {

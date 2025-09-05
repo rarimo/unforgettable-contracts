@@ -31,7 +31,6 @@ contract SubscriptionsStateReceiver is
             address(_getSSRStorage().wormholeRelayer) == msg.sender,
             NotWormholeRelayer(msg.sender)
         );
-
         _;
     }
 

@@ -102,6 +102,12 @@ contract SideChainSubscriptionManager is
     // solhint-disable-next-line no-empty-blocks
     function _authorizeUpgrade(address newImplementation_) internal override onlyOwner {}
 
+    function _setEndTime(address account_, uint64 newEndTime_) internal virtual override {
+        if (newEndTime_ > getSubscriptionEndTime(account_)) {
+            super._setEndTime(account_, newEndTime_);
+        }
+    }
+
     function _verifyProof(
         address account_,
         AccountSubscriptionData calldata subscriptionData,

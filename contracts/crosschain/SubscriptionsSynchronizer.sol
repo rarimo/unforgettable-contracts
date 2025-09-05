@@ -24,13 +24,12 @@ contract SubscriptionsSynchronizer is
     using SparseMerkleTree for SparseMerkleTree.Bytes32SMT;
     using EnumerableSet for EnumerableSet.AddressSet;
 
-    uint256 constant GAS_LIMIT = 50_000; // Adjust the gas limit as needed
-
     bytes32 public constant SUBSCRIPTIONS_SYNCHRONIZER_STORAGE_SLOT =
         keccak256("unforgettable.contract.subscriptions.synchronizer.storage");
 
     struct SubscriptionSynchronizerStorage {
         IWormholeRelayer wormholeRelayer;
+        uint256 crossChainTxGasLimit;
         SparseMerkleTree.Bytes32SMT subscriptionsSMT;
         EnumerableSet.AddressSet subscriptionManagers;
         mapping(uint16 chainId => address) targetAddresses;
@@ -54,6 +53,7 @@ contract SubscriptionsSynchronizer is
         __Ownable_init(msg.sender);
 
         _updateWormholeRelayer(initData_.wormholeRelayer);
+        _setCrossChainTxGasLimit(initData_.crossChainTxGasLimit);
         _initializeSubscriptionsSMT(initData_.SMTMaxDepth);
 
         address[] calldata subscriptionManagers_ = initData_.subscriptionManagers;
@@ -87,38 +87,34 @@ contract SubscriptionsSynchronizer is
             targetAddress_,
             message_,
             0, // No receiver value needed
-            GAS_LIMIT // Gas limit for the transaction
+            $.crossChainTxGasLimit // Gas limit for the transaction
         );
+
+        emit SyncInitiated(block.timestamp);
     }
 
     function updateWormholeRelayer(address wormholeRelayer_) public onlyOwner {
         _updateWormholeRelayer(wormholeRelayer_);
-
-        emit WormholeRelayerUpdated(wormholeRelayer_);
     }
 
     function addSubscriptionManager(address subscriptionManager_) public onlyOwner {
         _addSubscriptionManager(subscriptionManager_);
-
-        emit SubscriptionManagerAdded(subscriptionManager_);
     }
 
     function removeSubscriptionManager(address subscriptionManager_) public onlyOwner {
         _removeSubscriptionManager(subscriptionManager_);
-
-        emit SubscriptionManagerRemoved(subscriptionManager_);
     }
 
     function addDestination(Destination calldata destination_) public onlyOwner {
         _addDestination(destination_);
-
-        emit DestinationAdded(destination_.chainId, destination_.targetAddress);
     }
 
     function removeDestination(uint16 chainId_) public onlyOwner {
         _removeDestination(chainId_);
+    }
 
-        emit DestinationRemoved(chainId_);
+    function setCrossChainTxGasLimit(uint256 gasLimit_) public onlyOwner {
+        _setCrossChainTxGasLimit(gasLimit_);
     }
 
     function saveSubscriptionData(
@@ -143,7 +139,7 @@ contract SubscriptionsSynchronizer is
         (_cost, ) = _getSSStorage().wormholeRelayer.quoteEVMDeliveryPrice(
             targetChain_,
             0,
-            GAS_LIMIT
+            _getSSStorage().crossChainTxGasLimit
         );
     }
 
@@ -174,12 +170,16 @@ contract SubscriptionsSynchronizer is
         _checkAddress(wormholeRelayer_, "WormholeRelayer");
 
         _getSSStorage().wormholeRelayer = IWormholeRelayer(wormholeRelayer_);
+
+        emit WormholeRelayerUpdated(wormholeRelayer_);
     }
 
     function _addSubscriptionManager(address subscriptionManager_) internal {
         _checkAddress(subscriptionManager_, "SubscriptionManager");
 
         _getSSStorage().subscriptionManagers.add(subscriptionManager_);
+
+        emit SubscriptionManagerAdded(subscriptionManager_);
     }
 
     function _addDestination(Destination calldata destination_) internal {
@@ -197,12 +197,16 @@ contract SubscriptionsSynchronizer is
         );
 
         $.targetAddresses[chainId_] = targetAddress_;
+
+        emit DestinationAdded(destination_.chainId, destination_.targetAddress);
     }
 
     function _removeSubscriptionManager(address subscriptionManager_) internal {
         _checkAddress(subscriptionManager_, "SubscriptionManager");
 
         _getSSStorage().subscriptionManagers.remove(subscriptionManager_);
+
+        emit SubscriptionManagerRemoved(subscriptionManager_);
     }
 
     function _removeDestination(uint16 chainId_) internal {
@@ -213,6 +217,14 @@ contract SubscriptionsSynchronizer is
         require(targetAddress_ != address(0), ChainNotSupported(chainId_));
 
         delete $.targetAddresses[chainId_];
+
+        emit DestinationRemoved(chainId_);
+    }
+
+    function _setCrossChainTxGasLimit(uint256 gasLimit_) internal {
+        _getSSStorage().crossChainTxGasLimit = gasLimit_;
+
+        emit CrossChainTxGasLimitUpdated(gasLimit_);
     }
 
     function _constructMessage() internal view returns (bytes memory) {

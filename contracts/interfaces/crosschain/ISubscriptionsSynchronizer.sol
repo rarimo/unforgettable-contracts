@@ -6,6 +6,7 @@ import {ISubscriptionMessanger} from "./ISubscriptionMessanger.sol";
 interface ISubscriptionsSynchronizer is ISubscriptionMessanger {
     struct SubscriptionsSynchronizerInitData {
         address wormholeRelayer;
+        uint256 crossChainTxGasLimit;
         uint32 SMTMaxDepth;
         address[] subscriptionManagers;
         Destination[] destinations;
@@ -16,11 +17,13 @@ interface ISubscriptionsSynchronizer is ISubscriptionMessanger {
         address targetAddress;
     }
 
+    event SyncInitiated(uint256 timestamp);
     event WormholeRelayerUpdated(address indexed relayer);
     event SubscriptionManagerAdded(address indexed subscriptionManager);
     event SubscriptionManagerRemoved(address indexed subscriptionManager);
     event DestinationAdded(uint16 indexed chainId, address indexed targetAddress);
     event DestinationRemoved(uint16 indexed chainId);
+    event CrossChainTxGasLimitUpdated(uint256 gasLimit);
 
     error NotSubscriptionManager();
     error InsufficientFundsForCrossChainDelivery();

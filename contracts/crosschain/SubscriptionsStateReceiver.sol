@@ -23,6 +23,7 @@ contract SubscriptionsStateReceiver is
         address wormholeRelayer;
         uint16 sourceChainId;
         address sourceSubscriptionsSynchronizer;
+        bytes32 latestSyncedSMTRoot;
         mapping(bytes32 subscriptionsSMTRoot => uint256) SMTRootsHistory;
     }
 
@@ -96,6 +97,10 @@ contract SubscriptionsStateReceiver is
         emit MessageReceived(payload_);
     }
 
+    function getLatestSyncedSMTRoot() public view returns (bytes32) {
+        return _getSSRStorage().latestSyncedSMTRoot;
+    }
+
     function rootInHistory(bytes32 smtRoot_) public view returns (bool) {
         return _getSSRStorage().SMTRootsHistory[smtRoot_] > 0;
     }
@@ -126,6 +131,7 @@ contract SubscriptionsStateReceiver is
             OutdatedSyncMessage()
         );
 
+        $.latestSyncedSMTRoot = message_.subscriptionsSMTRoot;
         $.SMTRootsHistory[message_.subscriptionsSMTRoot] = message_.syncTimestamp;
     }
 

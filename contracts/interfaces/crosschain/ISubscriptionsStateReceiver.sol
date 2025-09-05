@@ -27,5 +27,7 @@ interface ISubscriptionsStateReceiver is IWormholeReceiver, ISubscriptionMessang
 
     function updateSourceChainId(uint16 sourceChainId_) external;
 
+    function getLatestSyncedSMTRoot() external view returns (bytes32);
+
     function rootInHistory(bytes32 smtRoot_) external view returns (bool);
 }

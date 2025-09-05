@@ -5,6 +5,8 @@ import {IWormholeRelayer} from "@wormhole/interfaces/IWormholeRelayer.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import {ADeployerGuard} from "@solarity/solidity-lib/utils/ADeployerGuard.sol";
@@ -78,7 +80,7 @@ contract SubscriptionsSynchronizer is
 
         uint256 _cost = quoteCrossChainCost(targetChain_); // Dynamically calculate the cross-chain cost
 
-        require(msg.value == _cost, InsufficientFundsForCrossChainDelivery());
+        require(msg.value >= _cost, InsufficientFundsForCrossChainDelivery());
 
         bytes memory message_ = _constructMessage();
 
@@ -89,6 +91,12 @@ contract SubscriptionsSynchronizer is
             0, // No receiver value needed
             $.crossChainTxGasLimit // Gas limit for the transaction
         );
+
+        uint256 excess_ = msg.value - _cost;
+
+        if (excess_ > 0) {
+            Address.sendValue(payable(msg.sender), excess_);
+        }
 
         emit SyncInitiated(block.timestamp);
     }

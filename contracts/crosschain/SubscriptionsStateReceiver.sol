@@ -26,14 +26,6 @@ contract SubscriptionsStateReceiver is
         mapping(bytes32 subscriptionsSMTRoot => uint256) SMTRootsHistory;
     }
 
-    modifier onlyWormholeRelayer() {
-        require(
-            address(_getSSRStorage().wormholeRelayer) == msg.sender,
-            NotWormholeRelayer(msg.sender)
-        );
-        _;
-    }
-
     constructor() ADeployerGuard(msg.sender) {
         _disableInitializers();
     }
@@ -86,7 +78,9 @@ contract SubscriptionsStateReceiver is
         bytes32 sourceAddress_,
         uint16 sourceChain_,
         bytes32 // delivery hash
-    ) public payable override onlyWormholeRelayer {
+    ) public payable override {
+        _authWormholeRelayer();
+
         SubscriptionsStateReceiverStorage storage $ = _getSSRStorage();
 
         require(sourceChain_ == $.sourceChainId, InvalidSourceChainId());
@@ -137,5 +131,12 @@ contract SubscriptionsStateReceiver is
 
     function _decodeMessage(bytes memory message_) internal pure returns (SyncMessage memory) {
         return abi.decode(message_, (SyncMessage));
+    }
+
+    function _authWormholeRelayer() private view {
+        require(
+            address(_getSSRStorage().wormholeRelayer) == msg.sender,
+            NotWormholeRelayer(msg.sender)
+        );
     }
 }

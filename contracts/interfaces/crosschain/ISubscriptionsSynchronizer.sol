@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import {SparseMerkleTree} from "@solarity/solidity-lib/libs/data-structures/SparseMerkleTree.sol";
+
 import {ISubscriptionMessanger} from "./ISubscriptionMessanger.sol";
 
 interface ISubscriptionsSynchronizer is ISubscriptionMessanger {
@@ -53,7 +55,7 @@ interface ISubscriptionsSynchronizer is ISubscriptionMessanger {
     function getSubscriptionsSMTProof(
         address subscriptionManager_,
         address account_
-    ) external view returns (bytes32[] memory proof_);
+    ) external view returns (SparseMerkleTree.Proof memory proof_);
 
     function isChainSupported(uint16 chainId_) external view returns (bool);
 }

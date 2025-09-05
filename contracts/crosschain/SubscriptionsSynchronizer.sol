@@ -154,12 +154,8 @@ contract SubscriptionsSynchronizer is
     function getSubscriptionsSMTProof(
         address subscriptionManager_,
         address account_
-    ) public view returns (bytes32[] memory) {
-        return
-            _getSSStorage()
-                .subscriptionsSMT
-                .getProof(_key(subscriptionManager_, account_))
-                .siblings;
+    ) public view returns (SparseMerkleTree.Proof memory) {
+        return _getSSStorage().subscriptionsSMT.getProof(_key(subscriptionManager_, account_));
     }
 
     function _initializeSubscriptionsSMT(uint32 maxDepth_) internal {

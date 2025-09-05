@@ -213,8 +213,6 @@ contract SubscriptionsSynchronizer is
     }
 
     function _removeDestination(uint16 chainId_) internal {
-        require(chainId_ != 0 && chainId_ != block.chainid, InvalidChainId(chainId_));
-
         SubscriptionSynchronizerStorage storage $ = _getSSStorage();
 
         address targetAddress_ = $.targetAddresses[chainId_];

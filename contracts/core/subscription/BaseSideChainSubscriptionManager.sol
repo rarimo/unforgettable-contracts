@@ -7,6 +7,8 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
+import {SparseMerkleTree} from "@solarity/solidity-lib/libs/data-structures/SparseMerkleTree.sol";
+
 import {IBaseSideChainSubscriptionManager} from "../../interfaces/core/IBaseSideChainSubscriptionManager.sol";
 import {ISubscriptionsStateReceiver} from "../../interfaces/crosschain/ISubscriptionsStateReceiver.sol";
 import {BaseSubscriptionModule} from "./modules/BaseSubscriptionModule.sol";
@@ -69,7 +71,7 @@ contract BaseSideChainSubscriptionManager is
     function syncSubscription(
         address account_,
         AccountSubscriptionData calldata subscriptionData_,
-        bytes32[] calldata proof_
+        SparseMerkleTree.Proof calldata proof_
     ) public virtual whenNotPaused nonReentrant {
         _verifyProof(account_, subscriptionData_, proof_);
 
@@ -110,43 +112,31 @@ contract BaseSideChainSubscriptionManager is
     function _verifyProof(
         address account_,
         AccountSubscriptionData calldata subscriptionData,
-        bytes32[] calldata proof_
+        SparseMerkleTree.Proof calldata proof_
     ) internal view {
         BaseSideChainSubscriptionManagerStorage
             storage $ = _getBaseSideChainSubscriptionManagerStorage();
 
-        bytes32 key_ = keccak256(abi.encode($.sourceSubscriptionManager, account_));
-        bytes32 value_ = keccak256(
-            abi.encode(
-                $.sourceSubscriptionManager,
-                account_,
-                subscriptionData.startTime,
-                subscriptionData.endTime
-            )
-        );
-
-        bytes32 computedHash_ = _hash3(key_, value_, bytes32(uint256(1)));
-        uint256 pathIndex_ = uint256(key_);
-        uint256 depth_ = proof_.length;
-
-        while (depth_ > 0 && proof_[depth_ - 1] == bytes32(0)) {
-            --depth_;
-        }
-
-        for (uint256 i = depth_; i > 0; --i) {
-            uint256 sIndex_ = i - 1;
-
-            if ((pathIndex_ >> sIndex_) & 1 == 1) {
-                computedHash_ = _hash2(proof_[sIndex_], computedHash_);
-            } else {
-                computedHash_ = _hash2(computedHash_, proof_[sIndex_]);
-            }
-        }
-
         require(
-            $.subscriptionsStateReceiver.rootInHistory(computedHash_),
-            UnkownRoot(computedHash_)
+            proof_.key == keccak256(abi.encode($.sourceSubscriptionManager, account_)),
+            InvalidProofKey()
         );
+        require(
+            proof_.value ==
+                keccak256(
+                    abi.encode(
+                        $.sourceSubscriptionManager,
+                        account_,
+                        subscriptionData.startTime,
+                        subscriptionData.endTime
+                    )
+                ),
+            InvalidProofValue()
+        );
+
+        bytes32 root_ = SparseMerkleTree.processProof(_hash2, _hash3, proof_);
+
+        require($.subscriptionsStateReceiver.rootInHistory(root_), UnkownRoot(root_));
     }
 
     function _hash2(bytes32 a_, bytes32 b_) private pure returns (bytes32 result_) {

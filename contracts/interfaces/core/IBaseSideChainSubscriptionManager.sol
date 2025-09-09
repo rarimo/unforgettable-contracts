@@ -14,7 +14,7 @@ interface IBaseSideChainSubscriptionManager is IBaseSubscriptionModule {
     event SourceSubscriptionManagerUpdated(address indexed sourceSubscriptionManager);
 
     error UnkownRoot(bytes32 root);
-    error InvalidSMTKey();
-    error InvalidSMTValue();
     error InvalidSMTProof();
+    error InvalidProofKey();
+    error InvalidProofValue();
 }

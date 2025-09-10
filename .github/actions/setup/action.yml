@@ -19,3 +19,8 @@ runs:
       uses: foundry-rs/foundry-toolchain@v1
       with:
         version: nightly
+
+    - name: Compile Foundry Contracts
+      run: forge build
+      shell: bash
+      working-directory: ./evm

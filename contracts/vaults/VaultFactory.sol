@@ -76,14 +76,17 @@ contract VaultFactory is
         _updateVaultImplementation(vaultImplementation_);
     }
 
+    /// @inheritdoc IVaultFactory
     function updateVaultImplementation(address newVaultImpl_) external onlyOwner {
         _updateVaultImplementation(newVaultImpl_);
     }
 
+    /// @inheritdoc IVaultFactory
     function updateTokenLimitAmount(address token_, uint256 newLimitAmount_) external onlyOwner {
         _updateTokenLimitAmount(token_, newLimitAmount_);
     }
 
+    /// @inheritdoc IVaultFactory
     function deployVault(
         address masterKey_,
         address paymentToken_,
@@ -119,6 +122,7 @@ contract VaultFactory is
         );
     }
 
+    /// @inheritdoc IVaultFactory
     function deployVaultWithSBT(
         address masterKey_,
         address sbt_,
@@ -134,6 +138,7 @@ contract VaultFactory is
         subscriptionManager_.buySubscriptionWithSBT(vaultAddr_, sbt_, msg.sender, tokenId_);
     }
 
+    /// @inheritdoc IVaultFactory
     function deployVaultWithSignature(
         address masterKey_,
         uint64 initialSubscriptionDuration_,
@@ -154,10 +159,12 @@ contract VaultFactory is
         );
     }
 
+    /// @inheritdoc IVaultFactory
     function getVaultCountByCreator(address vaultCreator_) external view returns (uint256) {
         return _getVaultFactoryStorage().vaultsByCreator[vaultCreator_].length();
     }
 
+    /// @inheritdoc IVaultFactory
     function getVaultsByCreatorPart(
         address vaultCreator_,
         uint256 offset_,
@@ -166,22 +173,27 @@ contract VaultFactory is
         return _getVaultFactoryStorage().vaultsByCreator[vaultCreator_].part(offset_, limit_);
     }
 
+    /// @inheritdoc IVaultFactory
     function isVault(address vaultAddr_) external view returns (bool) {
         return bytes(getVaultName(vaultAddr_)).length > 0;
     }
 
+    /// @inheritdoc IVaultFactory
     function getTokenLimitAmount(address token_) external view returns (uint256) {
         return _getVaultFactoryStorage().tokensLimitAmounts[token_];
     }
 
+    /// @inheritdoc IVaultFactory
     function getVaultSubscriptionManager() external view returns (address) {
         return _getVaultFactoryStorage().vaultSubscriptionManager;
     }
 
+    /// @inheritdoc IVaultFactory
     function getVaultImplementation() external view returns (address) {
         return _getVaultFactoryStorage().vaultImplementation;
     }
 
+    /// @inheritdoc IVaultFactory
     function predictVaultAddress(
         address masterKey_,
         uint256 nonce_
@@ -189,22 +201,27 @@ contract VaultFactory is
         return CREATE3.predictDeterministicAddress(getDeployVaultSalt(masterKey_, nonce_));
     }
 
+    /// @inheritdoc IVaultFactory
     function implementation() external view returns (address) {
         return ERC1967Utils.getImplementation();
     }
 
+    /// @inheritdoc IVaultFactory
     function isVaultNameAvailable(string memory name_) public view returns (bool) {
         return getVaultByName(name_) == address(0);
     }
 
+    /// @inheritdoc IVaultFactory
     function getVaultName(address vault_) public view returns (string memory) {
         return _getVaultFactoryStorage().vaultNames[vault_];
     }
 
+    /// @inheritdoc IVaultFactory
     function getVaultByName(string memory vaultName_) public view returns (address) {
         return _getVaultFactoryStorage().namesToVaults[keccak256(bytes(vaultName_))];
     }
 
+    /// @inheritdoc IVaultFactory
     function getDeployVaultSalt(address masterKey_, uint256 nonce_) public pure returns (bytes32) {
         return keccak256(abi.encodePacked(masterKey_, nonce_));
     }

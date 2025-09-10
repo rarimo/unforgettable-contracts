@@ -52,7 +52,7 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
      *
      * @dev Must be executed via the Safe wallet delegate call.
      *
-     * @param provider_ the address of an IRecoveryManager provider to add.
+     * @param provider_ The address of an IRecoveryManager provider to add.
      * @param recoveryData_ Encoded owners array and recovery manager subscription data.
      */
     function addRecoveryProvider(
@@ -67,7 +67,7 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
      *
      * @dev Must be executed via the Safe wallet delegate call.
      *
-     * @param provider_ the address of a previously added recovery provider to remove.
+     * @param provider_ The address of a previously added recovery provider to remove.
      */
     function removeRecoveryProvider(address provider_) external payable override onlyDelegateCall {
         _removeRecoveryProviderData(provider_);
@@ -79,7 +79,7 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
      * @dev Must be executed via the Safe wallet delegate call.
      * @dev Removes the current provider and adds it with new settings.
      *
-     * @param provider_ the address of the IRecoveryManager provider to update.
+     * @param provider_ The address of the IRecoveryManager provider to update.
      * @param recoveryData_ Encoded owners array and updated recovery manager subscription data.
      */
     function updateRecoveryProvider(
@@ -98,8 +98,8 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
      *      triggers a Safe module call to `swapOwner` via `execTransactionFromModule`,
      *      replacing the old owner with the new one.
      * @param subject_ Encoded recovery subject (account_, prevOwner_, oldOwner_, newOwner_).
-     * @param provider_ the address of a provider verifying the recovery.
-     * @param proof_ an encoded proof of recovery.
+     * @param provider_ The address of a provider verifying the recovery.
+     * @param proof_ An encoded proof of recovery.
      * @return `true` if recovery is successful, `false` (or revert) otherwise.
      */
     function recoverAccess(
@@ -131,8 +131,8 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
      * @dev Must be executed via the Safe wallet delegate call because the module
      *      needs to read the recovery-related storage located in the Safe account.
      * @param object_ Encoded recovery object (account_, prevOwner_, oldOwner_, newOwner_).
-     * @param provider_ the address of a provider verifying the recovery.
-     * @param proof_ an encoded proof of recovery.
+     * @param provider_ The address of a provider verifying the recovery.
+     * @param proof_ An encoded proof of recovery.
      */
     function validateRecoveryFromAccount(
         bytes memory object_,
@@ -165,9 +165,9 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
      * @notice Retrieves the list of recoverable owners registered under a provider for a Safe account.
      * @dev Reads the `recoverableOwners` EnumerableSet directly from the Safe wallet
      *      storage using `getStorageAt`.
-     * @param account_ the address of the Safe wallet where the recovery data is stored.
-     * @param provider_ the address of the recovery provider whose recoverable owners are queried.
-     * @return owners_ an array of owner addresses registered as recoverable under the provider.
+     * @param account_ The address of the Safe wallet where the recovery data is stored.
+     * @param provider_ The address of the recovery provider whose recoverable owners are queried.
+     * @return owners_ An array of owner addresses registered as recoverable under the provider.
      */
     function getRecoverableOwners(
         address account_,
@@ -196,10 +196,10 @@ contract UnforgettableRecoveryModule is AAccountRecovery {
      * @dev Reads the `recoveryMethodIds` nested mapping from the Safe wallet
      *      storage using `getStorageAt`.
      * @dev Each recoverable owner is assigned a unique method ID during provider registration.
-     * @param account_ the address of the Safe wallet where the recovery data is stored.
-     * @param provider_ the address of the recovery provider managing recovery for the owner.
-     * @param owner_ the address of the Safe owner whose recovery method ID is queried.
-     * @return the recovery method ID assigned to the owner for the specific provider.
+     * @param account_ The address of the Safe wallet where the recovery data is stored.
+     * @param provider_ The address of the recovery provider managing recovery for the owner.
+     * @param owner_ The address of the Safe owner whose recovery method ID is queried.
+     * @return The recovery method ID assigned to the owner for the specific provider.
      */
     function getRecoveryMethodId(
         address account_,

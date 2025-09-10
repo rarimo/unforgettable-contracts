@@ -23,4 +23,4 @@ runs:
     - name: Compile Foundry Contracts
       run: forge build
       shell: bash
-      working-directory: ./evm
+      working-directory: ./

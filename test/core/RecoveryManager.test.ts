@@ -1,5 +1,11 @@
 import { getRecoverAccountSignature } from "@/test/helpers/sign-utils";
-import { AccountSubscriptionManager, ERC20Mock, RecoveryManager, SignatureRecoveryStrategy } from "@ethers-v6";
+import {
+  AccountSubscriptionManager,
+  ERC20Mock,
+  RecoveryManager,
+  SignatureRecoveryStrategy,
+  SubscriptionsSynchronizer,
+} from "@ethers-v6";
 import { ETHER_ADDR, wei } from "@scripts";
 import { Reverter } from "@test-helpers";
 
@@ -29,6 +35,8 @@ describe("RecoveryManager", () => {
 
   let recoveryManager: RecoveryManager;
   let recoveryStrategy: SignatureRecoveryStrategy;
+
+  let subscriptionsSynchronizer: SubscriptionsSynchronizer;
 
   let paymentToken: ERC20Mock;
 
@@ -62,6 +70,25 @@ describe("RecoveryManager", () => {
 
     recoveryStrategy = await ethers.deployContract("SignatureRecoveryStrategy");
 
+    const subscriptionsSynchronizerImpl = await ethers.deployContract("SubscriptionsSynchronizer");
+    const subscriptionsSynchronizerProxy = await ethers.deployContract("ERC1967Proxy", [
+      await subscriptionsSynchronizerImpl.getAddress(),
+      "0x",
+    ]);
+
+    subscriptionsSynchronizer = await ethers.getContractAt(
+      "SubscriptionsSynchronizer",
+      await subscriptionsSynchronizerProxy.getAddress(),
+    );
+
+    await subscriptionsSynchronizer.initialize({
+      wormholeRelayer: SECOND.address,
+      crossChainTxGasLimit: 500000n,
+      SMTMaxDepth: 80,
+      subscriptionManagers: [await subscriptionManager.getAddress()],
+      destinations: [],
+    });
+
     await recoveryStrategy.initialize(await recoveryManager.getAddress());
     await recoveryManager.initialize([await subscriptionManager.getAddress()], [await recoveryStrategy.getAddress()]);
     await subscriptionManager.initialize({
@@ -87,9 +114,7 @@ describe("RecoveryManager", () => {
         subscriptionSigner: OWNER,
       },
       crossChainInitData: {
-        subscriptionsSMTMaxDepth: 80,
-        subscriptionsSynchronizer: ZeroAddress,
-        targetChains: [100],
+        subscriptionsSynchronizer: await subscriptionsSynchronizer.getAddress(),
       },
     });
 

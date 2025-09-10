@@ -1,4 +1,10 @@
-import { AccountSubscriptionManager, ERC20Mock, RecoveryManagerMock, SBTMock } from "@ethers-v6";
+import {
+  AccountSubscriptionManager,
+  ERC20Mock,
+  RecoveryManagerMock,
+  SBTMock,
+  SubscriptionsSynchronizer,
+} from "@ethers-v6";
 import { ETHER_ADDR, wei } from "@scripts";
 import { Reverter } from "@test-helpers";
 
@@ -30,6 +36,8 @@ describe("AccountSubscriptionManager", () => {
   let subscriptionManager: AccountSubscriptionManager;
   let recoveryManager: RecoveryManagerMock;
 
+  let subscriptionsSynchronizer: SubscriptionsSynchronizer;
+
   let paymentToken: ERC20Mock;
   let sbt: SBTMock;
 
@@ -53,6 +61,25 @@ describe("AccountSubscriptionManager", () => {
       "AccountSubscriptionManager",
       await subscriptionManagerProxy.getAddress(),
     );
+
+    const subscriptionsSynchronizerImpl = await ethers.deployContract("SubscriptionsSynchronizer");
+    const subscriptionsSynchronizerProxy = await ethers.deployContract("ERC1967Proxy", [
+      await subscriptionsSynchronizerImpl.getAddress(),
+      "0x",
+    ]);
+
+    subscriptionsSynchronizer = await ethers.getContractAt(
+      "SubscriptionsSynchronizer",
+      await subscriptionsSynchronizerProxy.getAddress(),
+    );
+
+    await subscriptionsSynchronizer.initialize({
+      wormholeRelayer: SECOND.address,
+      crossChainTxGasLimit: 500000n,
+      SMTMaxDepth: 80,
+      subscriptionManagers: [await subscriptionManager.getAddress()],
+      destinations: [],
+    });
 
     await subscriptionManager.initialize({
       subscriptionCreators: [await recoveryManager.getAddress()],
@@ -82,9 +109,7 @@ describe("AccountSubscriptionManager", () => {
         subscriptionSigner: SUBSCRIPTION_SIGNER,
       },
       crossChainInitData: {
-        subscriptionsSMTMaxDepth: 80,
-        subscriptionsSynchronizer: ZeroAddress,
-        targetChains: [100],
+        subscriptionsSynchronizer: await subscriptionsSynchronizer.getAddress(),
       },
     });
 
@@ -146,9 +171,7 @@ describe("AccountSubscriptionManager", () => {
             subscriptionSigner: SUBSCRIPTION_SIGNER,
           },
           crossChainInitData: {
-            subscriptionsSMTMaxDepth: 80,
             subscriptionsSynchronizer: ZeroAddress,
-            targetChains: [100],
           },
         }),
       )
@@ -172,9 +195,7 @@ describe("AccountSubscriptionManager", () => {
             subscriptionSigner: SUBSCRIPTION_SIGNER,
           },
           crossChainInitData: {
-            subscriptionsSMTMaxDepth: 80,
             subscriptionsSynchronizer: ZeroAddress,
-            targetChains: [100],
           },
         }),
       ).to.be.revertedWithCustomError(subscriptionManager, "InvalidInitialization");
@@ -196,9 +217,7 @@ describe("AccountSubscriptionManager", () => {
             subscriptionSigner: SUBSCRIPTION_SIGNER,
           },
           {
-            subscriptionsSMTMaxDepth: 80,
             subscriptionsSynchronizer: ZeroAddress,
-            targetChains: [100],
           },
         ),
       ).to.be.revertedWithCustomError(subscriptionManager, "NotInitializing");

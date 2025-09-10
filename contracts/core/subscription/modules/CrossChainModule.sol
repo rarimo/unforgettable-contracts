@@ -39,7 +39,7 @@ contract CrossChainModule is ICrossChainModule, BaseSubscriptionModule, Initiali
     }
 
     function _setSubscriptionSynchronizer(address subscriptionSynchronizer_) internal virtual {
-        _checkAddress(subscriptionSynchronizer_, "SubscriptionSynchronizer");
+        _checkAddress(subscriptionSynchronizer_, "SubscriptionsSynchronizer");
 
         _getCrossChainModuleStorage().subscriptionsSynchronizer = ISubscriptionsSynchronizer(
             subscriptionSynchronizer_

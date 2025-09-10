@@ -1,4 +1,11 @@
-import { ERC20Mock, SBTMock, Vault, VaultFactory, VaultSubscriptionManager } from "@ethers-v6";
+import {
+  ERC20Mock,
+  SBTMock,
+  SubscriptionsSynchronizer,
+  Vault,
+  VaultFactory,
+  VaultSubscriptionManager,
+} from "@ethers-v6";
 import { ETHER_ADDR, wei } from "@scripts";
 import { Reverter, getBuySubscriptionSignature } from "@test-helpers";
 
@@ -30,6 +37,8 @@ describe("VaultFactory", () => {
   let vaultFactory: VaultFactory;
   let subscriptionManager: VaultSubscriptionManager;
 
+  let subscriptionsSynchronizer: SubscriptionsSynchronizer;
+
   let paymentToken: ERC20Mock;
 
   let sbt: SBTMock;
@@ -57,6 +66,25 @@ describe("VaultFactory", () => {
       "VaultSubscriptionManager",
       await subscriptionManagerProxy.getAddress(),
     );
+
+    const subscriptionsSynchronizerImpl = await ethers.deployContract("SubscriptionsSynchronizer");
+    const subscriptionsSynchronizerProxy = await ethers.deployContract("ERC1967Proxy", [
+      await subscriptionsSynchronizerImpl.getAddress(),
+      "0x",
+    ]);
+
+    subscriptionsSynchronizer = await ethers.getContractAt(
+      "SubscriptionsSynchronizer",
+      await subscriptionsSynchronizerProxy.getAddress(),
+    );
+
+    await subscriptionsSynchronizer.initialize({
+      wormholeRelayer: SECOND.address,
+      crossChainTxGasLimit: 500000n,
+      SMTMaxDepth: 80,
+      subscriptionManagers: [await subscriptionManager.getAddress()],
+      destinations: [],
+    });
 
     await sbt.initialize("TestSBT", "TSBT", [subscriptionManager]);
 
@@ -90,9 +118,7 @@ describe("VaultFactory", () => {
         subscriptionSigner: SUBSCRIPTION_SIGNER,
       },
       crossChainInitData: {
-        subscriptionsSMTMaxDepth: 80,
-        subscriptionsSynchronizer: ZeroAddress,
-        targetChains: [100],
+        subscriptionsSynchronizer: await subscriptionsSynchronizer.getAddress(),
       },
     });
 

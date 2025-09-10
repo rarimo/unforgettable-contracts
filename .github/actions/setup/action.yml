@@ -14,3 +14,8 @@ runs:
     - name: Install packages
       run: npm install
       shell: bash
+
+    - name: Setup foundry
+      uses: foundry-rs/foundry-toolchain@v1
+      with:
+        version: nightly

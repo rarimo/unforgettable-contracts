@@ -170,12 +170,6 @@ abstract contract BaseSubscriptionManager is
         _setSubscriptionSynchronizer(subscriptionSynchronizer_);
     }
 
-    function setSubscriptionSynchronizer(
-        address subscriptionSynchronizer_
-    ) public virtual onlyOwner {
-        _setSubscriptionSynchronizer(subscriptionSynchronizer_);
-    }
-
     /// @inheritdoc ISubscriptionManager
     function createSubscription(address account_) public virtual onlySubscriptionCreator {
         _createSubscription(account_);

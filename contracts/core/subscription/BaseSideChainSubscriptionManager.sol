@@ -13,7 +13,7 @@ import {IBaseSideChainSubscriptionManager} from "../../interfaces/core/IBaseSide
 import {ISubscriptionsStateReceiver} from "../../interfaces/crosschain/ISubscriptionsStateReceiver.sol";
 import {BaseSubscriptionModule} from "./modules/BaseSubscriptionModule.sol";
 
-contract BaseSideChainSubscriptionManager is
+abstract contract BaseSideChainSubscriptionManager is
     IBaseSideChainSubscriptionManager,
     BaseSubscriptionModule,
     OwnableUpgradeable,
@@ -50,24 +50,35 @@ contract BaseSideChainSubscriptionManager is
         _setSourceSubscriptionManager(initData_.sourceSubscriptionManager);
     }
 
+    /**
+     * @notice A function to set a new SubscriptionsStateReceiver contract.
+     * @param subscriptionsStateReceiver_ The address of the SubscriptionsStateReceiver contract.
+     */
     function setSubscriptionsStateReceiver(
         address subscriptionsStateReceiver_
     ) external onlyOwner {
         _setSubscriptionsStateReceiver(subscriptionsStateReceiver_);
     }
 
+    /**
+     * @notice A function to set a new source SubscriptionManager contract.
+     * @param sourceSubscriptionManager_ The address of the source SubscriptionManager contract.
+     */
     function setSourceSubscriptionManager(address sourceSubscriptionManager_) external onlyOwner {
         _setSourceSubscriptionManager(sourceSubscriptionManager_);
     }
 
+    /// @inheritdoc IBaseSideChainSubscriptionManager
     function pause() public virtual onlyOwner {
         _pause();
     }
 
+    /// @inheritdoc IBaseSideChainSubscriptionManager
     function unpause() public virtual onlyOwner {
         _unpause();
     }
 
+    /// @inheritdoc IBaseSideChainSubscriptionManager
     function syncSubscription(
         address account_,
         AccountSubscriptionData calldata subscriptionData_,
@@ -84,6 +95,7 @@ contract BaseSideChainSubscriptionManager is
         emit SubscriptionSynced(account_, subscriptionData_.startTime, subscriptionData_.endTime);
     }
 
+    /// @inheritdoc IBaseSideChainSubscriptionManager
     function implementation() external view returns (address) {
         return ERC1967Utils.getImplementation();
     }
@@ -136,7 +148,7 @@ contract BaseSideChainSubscriptionManager is
 
         bytes32 root_ = SparseMerkleTree.processProof(_hash2, _hash3, proof_);
 
-        require($.subscriptionsStateReceiver.rootInHistory(root_), UnkownRoot(root_));
+        require($.subscriptionsStateReceiver.rootInHistory(root_), UnknownRoot(root_));
     }
 
     function _hash2(bytes32 a_, bytes32 b_) private pure returns (bytes32 result_) {

@@ -72,6 +72,7 @@ contract SubscriptionsSynchronizer is
         }
     }
 
+    /// @inheritdoc ISubscriptionsSynchronizer
     function sync(uint16 targetChain_) external payable {
         SubscriptionSynchronizerStorage storage $ = _getSSStorage();
 
@@ -103,30 +104,55 @@ contract SubscriptionsSynchronizer is
         emit SyncInitiated(block.timestamp);
     }
 
+    /**
+     * @notice A function to update the Wormhole Relayer contract address.
+     * @param wormholeRelayer_ The address of the new Wormhole Relayer contract
+     */
     function updateWormholeRelayer(address wormholeRelayer_) public onlyOwner {
         _updateWormholeRelayer(wormholeRelayer_);
     }
 
+    /**
+     * @notice A function to add a new subscription manager.
+     * @param subscriptionManager_ The address of the subscription manager to add.
+     */
     function addSubscriptionManager(address subscriptionManager_) public onlyOwner {
         _addSubscriptionManager(subscriptionManager_);
     }
 
+    /**
+     * @notice A function to remove a subscription manager.
+     * @param subscriptionManager_ The address of the subscription manager to remove.
+     */
     function removeSubscriptionManager(address subscriptionManager_) public onlyOwner {
         _removeSubscriptionManager(subscriptionManager_);
     }
 
+    /**
+     * @notice A function to add a new destination.
+     * @param destination_ The destination to add.
+     */
     function addDestination(Destination calldata destination_) public onlyOwner {
         _addDestination(destination_);
     }
 
+    /**
+     * @notice A function to remove a destination.
+     * @param chainId_ The ID of the chain to remove the destination for.
+     */
     function removeDestination(uint16 chainId_) public onlyOwner {
         _removeDestination(chainId_);
     }
 
+    /**
+     * @notice A function to set the gas limit for cross-chain transactions.
+     * @param gasLimit_ The new gas limit for cross-chain transactions.
+     */
     function setCrossChainTxGasLimit(uint256 gasLimit_) public onlyOwner {
         _setCrossChainTxGasLimit(gasLimit_);
     }
 
+    /// @inheritdoc ISubscriptionsSynchronizer
     function saveSubscriptionData(
         address account_,
         uint64 startTime_,
@@ -145,6 +171,11 @@ contract SubscriptionsSynchronizer is
         }
     }
 
+    /**
+     * @notice A function to quote the cost of a cross-chain transaction.
+     * @param targetChain_ The ID of the target chain.
+     * @return _cost The quoted cost for the cross-chain transaction.
+     */
     function quoteCrossChainCost(uint16 targetChain_) public view returns (uint256 _cost) {
         (_cost, ) = _getSSStorage().wormholeRelayer.quoteEVMDeliveryPrice(
             targetChain_,
@@ -153,14 +184,17 @@ contract SubscriptionsSynchronizer is
         );
     }
 
+    /// @inheritdoc ISubscriptionsSynchronizer
     function isChainSupported(uint16 chainId_) public view returns (bool) {
         return _getSSStorage().targetAddresses[chainId_] != address(0);
     }
 
+    /// @inheritdoc ISubscriptionsSynchronizer
     function getSubscriptionsSMTRoot() public view returns (bytes32) {
         return _getSSStorage().subscriptionsSMT.getRoot();
     }
 
+    /// @inheritdoc ISubscriptionsSynchronizer
     function getSubscriptionsSMTProof(
         address subscriptionManager_,
         address account_
@@ -254,7 +288,7 @@ contract SubscriptionsSynchronizer is
     function _authSubscriptionManager() private view {
         require(
             _getSSStorage().subscriptionManagers.contains(msg.sender),
-            NotSubscriptionManager()
+            NotSubscriptionManager(msg.sender)
         );
     }
 

@@ -53,16 +53,28 @@ contract SubscriptionsStateReceiver is
         }
     }
 
+    /**
+     * @notice A function to update the Wormhole Relayer contract address.
+     * @param wormholeRelayer_ The address of the new Wormhole Relayer contract
+     */
     function updateWormholeRelayer(address wormholeRelayer_) public onlyOwner {
         _updateWormholeRelayer(wormholeRelayer_);
     }
 
+    /**
+     * @notice A function to update the Subscriptions Synchronizer contract address.
+     * @param subscriptionsStateSynchronizer_ The address of the new Subscriptions Synchronizer contract.
+     */
     function updateSubscriptionsSynchronizer(
         address subscriptionsStateSynchronizer_
     ) public onlyOwner {
         _updateSubscriptionsSynchronizer(subscriptionsStateSynchronizer_);
     }
 
+    /**
+     * @notice A function to update the source chain ID.
+     * @param sourceChainId_ The new source chain ID.
+     */
     function updateSourceChainId(uint16 sourceChainId_) public onlyOwner {
         _updateSourceChainId(sourceChainId_);
     }
@@ -91,10 +103,12 @@ contract SubscriptionsStateReceiver is
         emit MessageReceived(payload_);
     }
 
+    /// @inheritdoc ISubscriptionsStateReceiver
     function getLatestSyncedSMTRoot() public view returns (bytes32) {
         return _getSSRStorage().latestSyncedSMTRoot;
     }
 
+    /// @inheritdoc ISubscriptionsStateReceiver
     function rootInHistory(bytes32 smtRoot_) public view returns (bool) {
         return _getSSRStorage().SMTRootsHistory[smtRoot_] > 0;
     }

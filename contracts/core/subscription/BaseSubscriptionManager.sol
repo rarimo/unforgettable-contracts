@@ -164,6 +164,10 @@ abstract contract BaseSubscriptionManager is
         _setSubscriptionSigner(newSigner_);
     }
 
+    /**
+     * @notice A function to set a new SubscriptionsSynchronizer contract.
+     * @param subscriptionSynchronizer_ Address of the new SubscriptionsSynchronizer contract.
+     */
     function setSubscriptionSynchronizer(
         address subscriptionSynchronizer_
     ) public virtual onlyOwner {

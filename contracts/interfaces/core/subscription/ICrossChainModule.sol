@@ -21,4 +21,10 @@ interface ICrossChainModule is IBaseSubscriptionModule {
      * @param subscriptionSynchronizer The address of the updated subscription synchronizer.
      */
     event SubscriptionSynchronizerUpdated(address indexed subscriptionSynchronizer);
+
+    /**
+     * @notice A function to retrieve the subscription syncronizer address.
+     * @return The subscription synchronizer address.
+     */
+    function getSubscriptionsSynchronizer() external view returns (address);
 }

@@ -98,7 +98,6 @@ contract SubscriptionsSynchronizer is
 
         if (excess_ > 0) {
             Address.sendValue(payable(msg.sender), excess_);
-            //address(msg.sender).sendValue(excess_);
         }
 
         emit SyncInitiated(block.timestamp);
@@ -182,6 +181,26 @@ contract SubscriptionsSynchronizer is
             0,
             _getSSStorage().crossChainTxGasLimit
         );
+    }
+
+    /// @inheritdoc ISubscriptionsSynchronizer
+    function getWormholeRelayer() public view returns (address) {
+        return address(_getSSStorage().wormholeRelayer);
+    }
+
+    /// @inheritdoc ISubscriptionsSynchronizer
+    function getCrossChainTxGasLimit() public view returns (uint256) {
+        return _getSSStorage().crossChainTxGasLimit;
+    }
+
+    /// @inheritdoc ISubscriptionsSynchronizer
+    function getSubscriptionManagers() public view returns (address[] memory) {
+        return _getSSStorage().subscriptionManagers.values();
+    }
+
+    /// @inheritdoc ISubscriptionsSynchronizer
+    function getTargetAddress(uint16 chainId_) public view returns (address) {
+        return _getSSStorage().targetAddresses[chainId_];
     }
 
     /// @inheritdoc ISubscriptionsSynchronizer

@@ -137,6 +137,34 @@ interface ISubscriptionsSynchronizer is ISubscriptionMessanger {
     ) external view returns (SparseMerkleTree.Proof memory _proof);
 
     /**
+     * @notice A function to get wormhole relayer address.
+     * @return _wormholeRelayer The wormhole relayer address.
+     */
+    function getWormholeRelayer() external view returns (address _wormholeRelayer);
+
+    /**
+     * @notice A function to get cross chain tx gas limit.
+     * @return _gasLimit The gas limit.
+     */
+    function getCrossChainTxGasLimit() external view returns (uint256 _gasLimit);
+
+    /**
+     * @notice A function to get the registered subscription managers
+     * @return _subscriptionManagers The registered subscription managers.
+     */
+    function getSubscriptionManagers()
+        external
+        view
+        returns (address[] memory _subscriptionManagers);
+
+    /**
+     * @notice A function to get the target address for the specified chain ID.
+     * @param chainId_ The chain ID.
+     * @return _targetAddress The target address for the specified chain ID.
+     */
+    function getTargetAddress(uint16 chainId_) external view returns (address _targetAddress);
+
+    /**
      * @notice A function to check if a specific chain is supported.
      * @param chainId_ The ID of the chain to check.
      * @return _supported A boolean indicating whether the chain is supported.

@@ -38,6 +38,11 @@ contract CrossChainModule is ICrossChainModule, BaseSubscriptionModule, Initiali
         _setSubscriptionSynchronizer(initData_.subscriptionsSynchronizer);
     }
 
+    /// @inheritdoc ICrossChainModule
+    function getSubscriptionsSynchronizer() external view returns (address) {
+        return address(_getCrossChainModuleStorage().subscriptionsSynchronizer);
+    }
+
     function _setSubscriptionSynchronizer(address subscriptionSynchronizer_) internal virtual {
         _checkAddress(subscriptionSynchronizer_, "SubscriptionsSynchronizer");
 

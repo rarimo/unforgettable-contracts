@@ -4,9 +4,7 @@ pragma solidity ^0.8.28;
 import {IWormholeRelayer} from "@wormhole/interfaces/IWormholeRelayer.sol";
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import {ADeployerGuard} from "@solarity/solidity-lib/utils/ADeployerGuard.sol";
@@ -72,37 +70,6 @@ contract SubscriptionsSynchronizer is
         }
     }
 
-    /// @inheritdoc ISubscriptionsSynchronizer
-    function sync(uint16 targetChain_) external payable {
-        SubscriptionSynchronizerStorage storage $ = _getSSStorage();
-
-        address targetAddress_ = $.targetAddresses[targetChain_];
-
-        require(targetAddress_ != address(0), ChainNotSupported(targetChain_));
-
-        uint256 _cost = quoteCrossChainCost(targetChain_); // Dynamically calculate the cross-chain cost
-
-        require(msg.value >= _cost, InsufficientFundsForCrossChainDelivery());
-
-        bytes memory message_ = _constructMessage();
-
-        $.wormholeRelayer.sendPayloadToEvm{value: _cost}(
-            targetChain_,
-            targetAddress_,
-            message_,
-            0, // No receiver value needed
-            $.crossChainTxGasLimit // Gas limit for the transaction
-        );
-
-        uint256 excess_ = msg.value - _cost;
-
-        if (excess_ > 0) {
-            Address.sendValue(payable(msg.sender), excess_);
-        }
-
-        emit SyncInitiated(block.timestamp);
-    }
-
     /**
      * @notice A function to update the Wormhole Relayer contract address.
      * @param wormholeRelayer_ The address of the new Wormhole Relayer contract
@@ -149,6 +116,35 @@ contract SubscriptionsSynchronizer is
      */
     function setCrossChainTxGasLimit(uint256 gasLimit_) public onlyOwner {
         _setCrossChainTxGasLimit(gasLimit_);
+    }
+
+    /// @inheritdoc ISubscriptionsSynchronizer
+    function sync(uint16 targetChain_) external payable {
+        _validateSupportedChain(targetChain_);
+
+        uint256 _cost = quoteCrossChainCost(targetChain_); // Dynamically calculate the cross-chain cost
+
+        require(msg.value >= _cost, InsufficientFundsForCrossChainDelivery());
+
+        bytes memory message_ = _constructMessage();
+
+        SubscriptionSynchronizerStorage storage $ = _getSSStorage();
+
+        $.wormholeRelayer.sendPayloadToEvm{value: _cost}(
+            targetChain_,
+            $.targetAddresses[targetChain_],
+            message_,
+            0, // No receiver value needed
+            $.crossChainTxGasLimit // Gas limit for the transaction
+        );
+
+        uint256 excess_ = msg.value - _cost;
+
+        if (excess_ > 0) {
+            Address.sendValue(payable(msg.sender), excess_);
+        }
+
+        emit SyncInitiated(block.timestamp);
     }
 
     /// @inheritdoc ISubscriptionsSynchronizer
@@ -269,13 +265,9 @@ contract SubscriptionsSynchronizer is
     }
 
     function _removeDestination(uint16 chainId_) internal {
-        SubscriptionSynchronizerStorage storage $ = _getSSStorage();
+        _validateSupportedChain(chainId_);
 
-        address targetAddress_ = $.targetAddresses[chainId_];
-
-        require(targetAddress_ != address(0), ChainNotSupported(chainId_));
-
-        delete $.targetAddresses[chainId_];
+        delete _getSSStorage().targetAddresses[chainId_];
 
         emit DestinationRemoved(chainId_);
     }
@@ -309,6 +301,10 @@ contract SubscriptionsSynchronizer is
             _getSSStorage().subscriptionManagers.contains(msg.sender),
             NotSubscriptionManager(msg.sender)
         );
+    }
+
+    function _validateSupportedChain(uint16 chainId_) private view {
+        require(isChainSupported(chainId_), ChainNotSupported(chainId_));
     }
 
     function _key(address subscriptionManager_, address account_) private pure returns (bytes32) {

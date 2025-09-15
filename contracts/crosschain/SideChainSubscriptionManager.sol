@@ -3,9 +3,9 @@ pragma solidity ^0.8.28;
 
 import {ADeployerGuard} from "@solarity/solidity-lib/utils/ADeployerGuard.sol";
 
-import {BaseSideChainSubscriptionManager} from "./BaseSideChainSubscriptionManager.sol";
+import {BaseSideChainSubscriptionManager} from "../core/subscription/BaseSideChainSubscriptionManager.sol";
 
-import {ISideChainSubscriptionManager} from "../../interfaces/core/ISideChainSubscriptionManager.sol";
+import {ISideChainSubscriptionManager} from "../interfaces/core/ISideChainSubscriptionManager.sol";
 
 contract SideChainSubscriptionManager is
     ISideChainSubscriptionManager,

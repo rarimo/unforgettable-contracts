@@ -86,7 +86,9 @@ abstract contract BaseSideChainSubscriptionManager is
     ) public virtual whenNotPaused nonReentrant {
         _verifyProof(account_, subscriptionData_, proof_);
 
-        _setStartTime(account_, subscriptionData_.startTime);
+        if (getSubscriptionStartTime(account_) == 0) {
+            _setStartTime(account_, subscriptionData_.startTime);
+        }
 
         if (subscriptionData_.endTime > getSubscriptionEndTime(account_)) {
             _setEndTime(account_, subscriptionData_.endTime);

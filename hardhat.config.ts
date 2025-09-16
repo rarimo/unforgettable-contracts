@@ -62,10 +62,7 @@ const config: HardhatUserConfig = {
     },
   },
   etherscan: {
-    apiKey: {
-      ethereum: `${process.env.ETHERSCAN_KEY}`,
-      sepolia: `${process.env.ETHERSCAN_KEY}`,
-    },
+    apiKey: `${process.env.ETHERSCAN_KEY}`,
   },
   migrate: {
     paths: {

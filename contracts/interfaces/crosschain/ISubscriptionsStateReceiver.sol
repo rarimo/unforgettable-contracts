@@ -61,6 +61,24 @@ interface ISubscriptionsStateReceiver is IWormholeReceiver, ISubscriptionMessang
     error OutdatedSyncMessage();
 
     /**
+     * @notice A function to get the Wormhole relayer address.
+     * @return The address of the Wormhole relayer.
+     */
+    function getWormholeRelayer() external view returns (address);
+
+    /**
+     * @notice A function to get the source subscriptions synchronizer address.
+     * @return The address of the source subscriptions synchronizer.
+     */
+    function getSourceSubscriptionsSynchronizer() external view returns (address);
+
+    /**
+     * @notice A function to get the source chain ID.
+     * @return The ID of the source chain.
+     */
+    function getSourceChainId() external view returns (uint16);
+
+    /**
      * @notice A function to get the latest synced Sparse Merkle Tree root.
      * @return _smtRoot The latest synced SMT root.
      */

@@ -92,7 +92,7 @@ contract SubscriptionsStateReceiver is
 
         require(sourceChain_ == $.sourceChainId, InvalidSourceChainId());
         require(
-            address(bytes20(sourceAddress_)) == $.sourceSubscriptionsSynchronizer,
+            address(uint160(uint256(sourceAddress_))) == $.sourceSubscriptionsSynchronizer,
             InvalidSourceAddress()
         );
 
@@ -101,6 +101,21 @@ contract SubscriptionsStateReceiver is
         _processMessage(_msg);
 
         emit MessageReceived(payload_);
+    }
+
+    /// @inheritdoc ISubscriptionsStateReceiver
+    function getWormholeRelayer() public view returns (address) {
+        return _getSSRStorage().wormholeRelayer;
+    }
+
+    /// @inheritdoc ISubscriptionsStateReceiver
+    function getSourceSubscriptionsSynchronizer() public view returns (address) {
+        return _getSSRStorage().sourceSubscriptionsSynchronizer;
+    }
+
+    /// @inheritdoc ISubscriptionsStateReceiver
+    function getSourceChainId() public view returns (uint16) {
+        return _getSSRStorage().sourceChainId;
     }
 
     /// @inheritdoc ISubscriptionsStateReceiver

@@ -102,6 +102,16 @@ abstract contract BaseSideChainSubscriptionManager is
         return ERC1967Utils.getImplementation();
     }
 
+    /// @inheritdoc IBaseSideChainSubscriptionManager
+    function getSubscriptionsStateReceiver() external view returns (address) {
+        return address(_getBaseSideChainSubscriptionManagerStorage().subscriptionsStateReceiver);
+    }
+
+    /// @inheritdoc IBaseSideChainSubscriptionManager
+    function getSourceSubscriptionManager() external view returns (address) {
+        return _getBaseSideChainSubscriptionManagerStorage().sourceSubscriptionManager;
+    }
+
     function _setSubscriptionsStateReceiver(address subscriptionsStateReceiver_) internal {
         _checkAddress(subscriptionsStateReceiver_, "SubscriptionsStateReceiver");
 

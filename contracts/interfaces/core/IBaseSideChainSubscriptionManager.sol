@@ -83,4 +83,16 @@ interface IBaseSideChainSubscriptionManager is IBaseSubscriptionModule {
      * @return The address of the current implementation.
      */
     function implementation() external view returns (address);
+
+    /**
+     * @notice A function to get the address of the current subscriptions state receiver.
+     * @return The address of the current subscriptions state receiver.
+     */
+    function getSubscriptionsStateReceiver() external view returns (address);
+
+    /**
+     * @notice A function to get the address of the current source subscription manager.
+     * @return The address of the current source subscription manager.
+     */
+    function getSourceSubscriptionManager() external view returns (address);
 }

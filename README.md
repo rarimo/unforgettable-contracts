@@ -27,6 +27,7 @@ contracts
 │   │   │   ├── SBTPaymentModule — "Subscription payments using SBTs mapped to fixed durations"
 │   │   │   ├── SignatureSubscriptionModule — "Subscription extension using signed EIP-712 permits"
 │   │   │   └── TokensPaymentModule — "Subscription payments in ETH or ERC-20 tokens"
+│   │   ├── BaseSideChainSubscriptionManager — "Base subscription manager for side chains"
 │   │   └── BaseSubscriptionManager — "Subscription manager coordinating multiple payment modules"
 │   ├── HelperDataRegistry — "Helper data storage updated via EIP-712 signatures"
 │   └── RecoveryManager — "Central recovery coordinator with pluggable strategies"
@@ -75,6 +76,22 @@ git submodule update --init --recursive
 ```
 
 ### Usage
+
+#### Compilation
+
+To compile contracts using Hardhat:
+
+```bash
+npm run compile
+```
+
+To compile contracts using Foundry:
+
+```bash
+forge build
+```
+
+#### Testing
 
 To run the tests, execute the following command:
 

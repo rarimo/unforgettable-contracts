@@ -5,6 +5,7 @@ import {
   RecoveryManager,
   SafeMock,
   SignatureRecoveryStrategy,
+  SubscriptionsSynchronizer,
   UnforgettableRecoveryModule,
 } from "@ethers-v6";
 import { wei } from "@scripts";
@@ -39,6 +40,8 @@ describe("UnforgettableRecoveryModule", () => {
 
   let recoveryManager: RecoveryManager;
   let recoveryStrategy: SignatureRecoveryStrategy;
+
+  let subscriptionsSynchronizer: SubscriptionsSynchronizer;
 
   let paymentToken: ERC20Mock;
 
@@ -157,6 +160,25 @@ describe("UnforgettableRecoveryModule", () => {
 
     recoveryStrategy = await ethers.deployContract("SignatureRecoveryStrategy");
 
+    const subscriptionsSynchronizerImpl = await ethers.deployContract("SubscriptionsSynchronizer");
+    const subscriptionsSynchronizerProxy = await ethers.deployContract("ERC1967Proxy", [
+      await subscriptionsSynchronizerImpl.getAddress(),
+      "0x",
+    ]);
+
+    subscriptionsSynchronizer = await ethers.getContractAt(
+      "SubscriptionsSynchronizer",
+      await subscriptionsSynchronizerProxy.getAddress(),
+    );
+
+    await subscriptionsSynchronizer.initialize({
+      wormholeRelayer: SECOND.address,
+      crossChainTxGasLimit: 500000n,
+      SMTMaxDepth: 80,
+      subscriptionManagers: [await subscriptionManager.getAddress()],
+      destinations: [],
+    });
+
     await recoveryStrategy.initialize(await recoveryManager.getAddress());
     await recoveryManager.initialize([await subscriptionManager.getAddress()], [await recoveryStrategy.getAddress()]);
     await subscriptionManager.initialize({
@@ -176,6 +198,9 @@ describe("UnforgettableRecoveryModule", () => {
       },
       sigSubscriptionInitData: {
         subscriptionSigner: OWNER,
+      },
+      crossChainInitData: {
+        subscriptionsSynchronizer: await subscriptionsSynchronizer.getAddress(),
       },
     });
 

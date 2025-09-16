@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {ITokensPaymentModule} from "./subscription/ITokensPaymentModule.sol";
 import {ISBTPaymentModule} from "./subscription/ISBTPaymentModule.sol";
 import {ISignatureSubscriptionModule} from "./subscription/ISignatureSubscriptionModule.sol";
+import {ICrossChainModule} from "./subscription/ICrossChainModule.sol";
 
 /**
  * @title ISubscriptionManager
@@ -12,7 +13,8 @@ import {ISignatureSubscriptionModule} from "./subscription/ISignatureSubscriptio
 interface ISubscriptionManager is
     ITokensPaymentModule,
     ISBTPaymentModule,
-    ISignatureSubscriptionModule
+    ISignatureSubscriptionModule,
+    ICrossChainModule
 {
     /**
      * @notice Thrown when trying to create a subscription for an account that already has one.

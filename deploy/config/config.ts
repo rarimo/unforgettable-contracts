@@ -11,10 +11,6 @@ export async function getConfig(): Promise<DeployConfig> {
     return validateConfig((await import("./sepolia")).deployConfig);
   }
 
-  if (hre.network.name == "bscTest") {
-    return validateConfig((await import("./bscTest")).deployConfig);
-  }
-
   throw new Error(`Config for network ${hre.network.name} is not specified`);
 }
 
@@ -29,6 +25,13 @@ function validateConfig(config: DeployConfig): DeployConfig {
 
   if (!ethers.isAddress(config.accountSubscriptionManagerConfig.signatureSubscriptionModuleConfig.subscriptionSigner)) {
     throw new Error("Invalid account subscription signer");
+  }
+
+  if (
+    !ethers.isAddress(config.crosschainConfig.subscriptionsStateReceiverConfig.wormholeRelayer) ||
+    !ethers.isAddress(config.crosschainConfig.subscriptionsSynchronizerConfig.wormholeRelayer)
+  ) {
+    throw new Error("Invalid wormhole relayer address");
   }
 
   return config;

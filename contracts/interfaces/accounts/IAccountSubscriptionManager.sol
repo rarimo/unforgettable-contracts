@@ -20,6 +20,7 @@ interface IAccountSubscriptionManager is ISubscriptionManager {
         TokensPaymentModuleInitData tokensPaymentInitData;
         SBTPaymentModuleInitData sbtPaymentInitData;
         SigSubscriptionModuleInitData sigSubscriptionInitData;
+        CrossChainModuleInitData crossChainInitData;
     }
 
     /**

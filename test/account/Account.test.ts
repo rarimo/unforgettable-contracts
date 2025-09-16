@@ -5,6 +5,7 @@ import {
   ERC20Mock,
   RecoveryManager,
   SignatureRecoveryStrategy,
+  SubscriptionsSynchronizer,
 } from "@ethers-v6";
 import { wei } from "@scripts";
 import { Reverter } from "@test-helpers";
@@ -12,6 +13,7 @@ import { Reverter } from "@test-helpers";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
 import { expect } from "chai";
+import { ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
 
 describe("Account", () => {
@@ -35,6 +37,8 @@ describe("Account", () => {
   let recoveryManager: RecoveryManager;
   let recoveryStrategy: SignatureRecoveryStrategy;
 
+  let subscriptionsSynchronizer: SubscriptionsSynchronizer;
+
   let paymentToken: ERC20Mock;
 
   let account: AccountMock;
@@ -57,11 +61,11 @@ describe("Account", () => {
     recoveryManager = await ethers.getContractAt("RecoveryManager", await recoveryManagerProxy.getAddress());
 
     subscriptionManagerImpl = await ethers.deployContract("AccountSubscriptionManager");
-
     const subscriptionManagerProxy = await ethers.deployContract("ERC1967Proxy", [
       await subscriptionManagerImpl.getAddress(),
       "0x",
     ]);
+
     subscriptionManager = await ethers.getContractAt(
       "AccountSubscriptionManager",
       await subscriptionManagerProxy.getAddress(),
@@ -69,8 +73,30 @@ describe("Account", () => {
 
     recoveryStrategy = await ethers.deployContract("SignatureRecoveryStrategy");
 
+    const subscriptionsSynchronizerImpl = await ethers.deployContract("SubscriptionsSynchronizer");
+    const subscriptionsSynchronizerProxy = await ethers.deployContract("ERC1967Proxy", [
+      await subscriptionsSynchronizerImpl.getAddress(),
+      "0x",
+    ]);
+
+    subscriptionsSynchronizer = await ethers.getContractAt(
+      "SubscriptionsSynchronizer",
+      await subscriptionsSynchronizerProxy.getAddress(),
+    );
+
+    await subscriptionsSynchronizer.initialize({
+      wormholeRelayer: SECOND.address,
+      crossChainTxGasLimit: 500000n,
+      SMTMaxDepth: 80,
+      subscriptionManagers: [await subscriptionManager.getAddress()],
+      destinations: [],
+    });
+
+    recoveryManager = await ethers.getContractAt("RecoveryManager", await recoveryManagerProxy.getAddress());
+
     await recoveryStrategy.initialize(await recoveryManager.getAddress());
     await recoveryManager.initialize([await subscriptionManager.getAddress()], [await recoveryStrategy.getAddress()]);
+
     await subscriptionManager.initialize({
       subscriptionCreators: [await recoveryManager.getAddress()],
       tokensPaymentInitData: {
@@ -88,6 +114,9 @@ describe("Account", () => {
       },
       sigSubscriptionInitData: {
         subscriptionSigner: OWNER,
+      },
+      crossChainInitData: {
+        subscriptionsSynchronizer: await subscriptionsSynchronizer.getAddress(),
       },
     });
 

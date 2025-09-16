@@ -17,12 +17,6 @@ interface IBaseSubscriptionModule {
     }
 
     /**
-     * @notice Thrown when a zero address is provided where not allowed.
-     * @param fieldName The name of the invalid field.
-     */
-    error ZeroAddr(string fieldName);
-
-    /**
      * @notice Emitted when a subscription is extended.
      * @param account The account for which the subscription was extended.
      * @param duration The duration in seconds added.

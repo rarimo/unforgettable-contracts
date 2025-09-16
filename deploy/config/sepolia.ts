@@ -42,6 +42,9 @@ export const deployConfig: DeployConfig = {
     signatureSubscriptionModuleConfig: {
       subscriptionSigner: "",
     },
+    crossChainModuleConfig: {
+      subscriptionsSynchronizer: "0x0000000000000000000000000000000000000000",
+    },
   },
   accountSubscriptionManagerConfig: {
     paymentTokenModuleConfig: {
@@ -77,6 +80,29 @@ export const deployConfig: DeployConfig = {
     },
     signatureSubscriptionModuleConfig: {
       subscriptionSigner: "",
+    },
+    crossChainModuleConfig: {
+      subscriptionsSynchronizer: "0x000000000000000000000000000000000000000",
+    },
+  },
+  sideChainSubscriptionManagerConfig: {
+    baseSideChainSubscriptionManagerConfig: {
+      subscriptionsStateReceiver: "0x0000000000000000000000000000000000000000",
+      sourceSubscriptionManager: "0x0000000000000000000000000000000000000000",
+    },
+  },
+  crosschainConfig: {
+    subscriptionsSynchronizerConfig: {
+      wormholeRelayer: "0x4a8bc80Ed5a4067f1CCf107057b8270E0cC11A78",
+      crossChainTxGasLimit: 50_000_000n,
+      SMTMaxDepth: 80,
+      subscriptionManagers: [],
+      destinations: [],
+    },
+    subscriptionsStateReceiverConfig: {
+      wormholeRelayer: "0x4a8bc80Ed5a4067f1CCf107057b8270E0cC11A78",
+      subscriptionsSynchronizer: "0x0000000000000000000000000000000000000000",
+      sourceChainId: 2,
     },
   },
 };

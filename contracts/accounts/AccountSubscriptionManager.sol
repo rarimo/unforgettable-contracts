@@ -23,7 +23,8 @@ contract AccountSubscriptionManager is
             initData_.subscriptionCreators,
             initData_.tokensPaymentInitData,
             initData_.sbtPaymentInitData,
-            initData_.sigSubscriptionInitData
+            initData_.sigSubscriptionInitData,
+            initData_.crossChainInitData
         );
     }
 

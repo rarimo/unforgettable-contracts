@@ -40,12 +40,6 @@ const config: HardhatUserConfig = {
       accounts: privateKey(),
       gasMultiplier: 1.2,
     },
-    bsctestnet: {
-      url: `https://bnb-testnet.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
-      chainId: 97,
-      accounts: privateKey(),
-      gasMultiplier: 1.2,
-    },
     bscTest: {
       url: `https://data-seed-prebsc-1-s1.binance.org:8545`,
       accounts: privateKey(),
@@ -71,7 +65,6 @@ const config: HardhatUserConfig = {
     apiKey: {
       ethereum: `${process.env.ETHERSCAN_KEY}`,
       sepolia: `${process.env.ETHERSCAN_KEY}`,
-      bscTestnet: `${process.env.BSCSCAN_KEY}`,
     },
   },
   migrate: {

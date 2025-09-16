@@ -29,6 +29,9 @@ export const deployConfig: DeployConfig = {
     signatureSubscriptionModuleConfig: {
       subscriptionSigner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
     },
+    crossChainModuleConfig: {
+      subscriptionsSynchronizer: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+    },
   },
   accountSubscriptionManagerConfig: {
     paymentTokenModuleConfig: {
@@ -51,6 +54,29 @@ export const deployConfig: DeployConfig = {
     },
     signatureSubscriptionModuleConfig: {
       subscriptionSigner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    },
+    crossChainModuleConfig: {
+      subscriptionsSynchronizer: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+    },
+  },
+  sideChainSubscriptionManagerConfig: {
+    baseSideChainSubscriptionManagerConfig: {
+      subscriptionsStateReceiver: "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707",
+      sourceSubscriptionManager: "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853",
+    },
+  },
+  crosschainConfig: {
+    subscriptionsSynchronizerConfig: {
+      wormholeRelayer: "0x4a8bc80Ed5a4067f1CCf107057b8270E0cC11A78",
+      crossChainTxGasLimit: 50_000_000n,
+      SMTMaxDepth: 80,
+      subscriptionManagers: [],
+      destinations: [],
+    },
+    subscriptionsStateReceiverConfig: {
+      wormholeRelayer: "0x4a8bc80Ed5a4067f1CCf107057b8270E0cC11A78",
+      subscriptionsSynchronizer: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+      sourceChainId: "2",
     },
   },
 };

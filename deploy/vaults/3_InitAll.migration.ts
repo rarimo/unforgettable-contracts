@@ -32,6 +32,7 @@ export = async (deployer: Deployer) => {
     tokensPaymentInitData: config.vaultSubscriptionManagerConfig.paymentTokenModuleConfig,
     sbtPaymentInitData: config.vaultSubscriptionManagerConfig.sbtPaymentModuleConfig,
     sigSubscriptionInitData: config.vaultSubscriptionManagerConfig.signatureSubscriptionModuleConfig,
+    crossChainInitData: config.vaultSubscriptionManagerConfig.crossChainModuleConfig,
   });
 
   await vaultFactory.initialize(await vaultImpl.getAddress(), await vaultSubscriptionManager.getAddress());

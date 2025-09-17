@@ -5,7 +5,8 @@
 Unforgettable Contracts is a set of Solidity smart contracts designed for smart account or vault access recovery 
 on top of the [EIP-7947](https://eips.ethereum.org/EIPS/eip-7947).
 
-It provides mechanisms for managing different recovery methods with subscription-based access.
+It provides mechanisms for managing different recovery methods with subscription-based access, including crosschain 
+subscription synchronization via Wormhole.
 
 ### Contracts
 
@@ -22,12 +23,18 @@ contracts
 │   ├── subscription
 │   │   ├── modules
 │   │   │   ├── BaseSubscriptionModule — "Basic subscription extension logic"
+│   │   │   ├── CrossChainModule — "Crosschain subscription synchronization module"
 │   │   │   ├── SBTPaymentModule — "Subscription payments using SBTs mapped to fixed durations"
 │   │   │   ├── SignatureSubscriptionModule — "Subscription extension using signed EIP-712 permits"
 │   │   │   └── TokensPaymentModule — "Subscription payments in ETH or ERC-20 tokens"
+│   │   ├── BaseSideChainSubscriptionManager — "Base subscription manager for side chains"
 │   │   └── BaseSubscriptionManager — "Subscription manager coordinating multiple payment modules"
 │   ├── HelperDataRegistry — "Helper data storage updated via EIP-712 signatures"
 │   └── RecoveryManager — "Central recovery coordinator with pluggable strategies"
+├── crosschain
+│   ├── SideChainSubscriptionManager — "Subscription manager for side chains with crosschain sync support"
+│   ├── SubscriptionsStateReceiver — "Receives and processes crosschain subscription state updates"
+│   └── SubscriptionsSynchronizer — "Synchronizes subscription states across chains via Wormhole"
 ├── libs
 │   ├── EIP712SignatureChecker — "A wrapper around OZ SignatureChecker for EIP-712 signature validations"
 │   └── TokensHelper — "ETH/ERC-20 transfer utilities"
@@ -56,15 +63,50 @@ To ensure that user vaults will always deploy at the same addresses with the sam
 > [!IMPORTANT]
 > We used the salt `0x00D37f35Ec44ecC4e2F54de1FA3208F73d632E5900004e6f6e204f626c697461` during deployment. This ensures that only the protocol address `0x00D37f35Ec44ecC4e2F54de1FA3208F73d632E59` can deploy the VaultFactory contract across all chains.
 
-### Dev info
+### Setup
 
-#### Usage
+This project uses both Hardhat and Foundry. Follow these steps to set up the repository:
 
-Install all the required dependencies:
+#### Prerequisites
+
+1. **Install Node.js** (v18 or later)
+2. **Install Foundry**:
+   ```bash
+   curl -L https://foundry.paradigm.xyz | bash
+   foundryup
+   ```
+
+#### Installation
+
+Install all required dependencies:
 
 ```bash
 npm install
 ```
+
+Initialize Foundry submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+### Usage
+
+#### Compilation
+
+To compile contracts using Hardhat:
+
+```bash
+npm run compile
+```
+
+To compile contracts using Foundry:
+
+```bash
+forge build
+```
+
+#### Testing
 
 To run the tests, execute the following command:
 

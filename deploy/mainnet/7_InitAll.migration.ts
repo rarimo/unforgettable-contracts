@@ -1,6 +1,7 @@
 import {
   AccountSubscriptionManager__factory,
   RecoveryManager__factory,
+  SideChainSubscriptionManager__factory,
   SignatureRecoveryStrategy__factory,
 } from "@ethers-v6";
 
@@ -18,6 +19,11 @@ export = async (deployer: Deployer) => {
     "AccountSubscriptionManager proxy",
   );
 
+  const sideChainSubscriptionManager = await deployer.deployed(
+    SideChainSubscriptionManager__factory,
+    "SideChainSubscriptionManager proxy",
+  );
+
   const signatureRecoveryStrategy = await deployer.deployed(
     SignatureRecoveryStrategy__factory,
     "SignatureRecoveryStrategy proxy",
@@ -33,5 +39,11 @@ export = async (deployer: Deployer) => {
     tokensPaymentInitData: config.accountSubscriptionManagerConfig.paymentTokenModuleConfig,
     sbtPaymentInitData: config.accountSubscriptionManagerConfig.sbtPaymentModuleConfig,
     sigSubscriptionInitData: config.accountSubscriptionManagerConfig.signatureSubscriptionModuleConfig,
+    crossChainInitData: config.accountSubscriptionManagerConfig.crossChainModuleConfig,
+  });
+
+  await sideChainSubscriptionManager.initialize({
+    baseSideChainSubscriptionManagerInitData:
+      config.sideChainSubscriptionManagerConfig.baseSideChainSubscriptionManagerConfig,
   });
 };

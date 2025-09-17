@@ -1,5 +1,6 @@
 import "@nomicfoundation/hardhat-chai-matchers";
 import "@nomicfoundation/hardhat-ethers";
+import "@nomicfoundation/hardhat-foundry";
 import "@nomicfoundation/hardhat-verify";
 
 import "@solarity/hardhat-gobind";
@@ -35,7 +36,7 @@ const config: HardhatUserConfig = {
       gasMultiplier: 1.2,
     },
     sepolia: {
-      url: `https://sepolia.infura.io/v3/${process.env.INFURA_KEY}`,
+      url: `https://eth-sepolia.g.alchemy.com/v2/${process.env.ALCHEMY_KEY}`,
       accounts: privateKey(),
       gasMultiplier: 1.2,
     },

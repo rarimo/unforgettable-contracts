@@ -23,16 +23,19 @@ contract AccountSubscriptionManager is
             initData_.subscriptionCreators,
             initData_.tokensPaymentInitData,
             initData_.sbtPaymentInitData,
-            initData_.sigSubscriptionInitData
+            initData_.sigSubscriptionInitData,
+            initData_.crossChainInitData
         );
     }
 
+    /// @inheritdoc IAccountSubscriptionManager
     function addSubscriptionCreators(address[] calldata subscriptionCreators_) external onlyOwner {
         for (uint256 i = 0; i < subscriptionCreators_.length; ++i) {
             _addSubscriptionCreator(subscriptionCreators_[i]);
         }
     }
 
+    /// @inheritdoc IAccountSubscriptionManager
     function removeSubscriptionCreators(
         address[] calldata subscriptionCreators_
     ) external onlyOwner {

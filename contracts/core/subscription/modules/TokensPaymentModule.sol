@@ -65,6 +65,7 @@ contract TokensPaymentModule is ITokensPaymentModule, BaseSubscriptionModule, In
         }
     }
 
+    /// @inheritdoc ITokensPaymentModule
     function buySubscription(
         address account_,
         address token_,
@@ -73,18 +74,22 @@ contract TokensPaymentModule is ITokensPaymentModule, BaseSubscriptionModule, In
         _buySubscription(msg.sender, account_, token_, duration_);
     }
 
+    /// @inheritdoc ITokensPaymentModule
     function getBasePaymentPeriod() public view virtual returns (uint64) {
         return _getTokensPaymentModuleStorage().basePaymentPeriod;
     }
 
+    /// @inheritdoc ITokensPaymentModule
     function getSubscriptionDurationFactor(uint64 duration_) public view returns (uint256) {
         return _getTokensPaymentModuleStorage().durationFactors[duration_];
     }
 
+    /// @inheritdoc ITokensPaymentModule
     function getPaymentTokens() public view returns (address[] memory) {
         return _getTokensPaymentModuleStorage().paymentTokens.values();
     }
 
+    /// @inheritdoc ITokensPaymentModule
     function getSubscriptionCost(
         address account_,
         address token_,
@@ -110,10 +115,12 @@ contract TokensPaymentModule is ITokensPaymentModule, BaseSubscriptionModule, In
         return _applyDurationFactor(account_, duration_, totalCost_);
     }
 
+    /// @inheritdoc ITokensPaymentModule
     function getTokenBaseSubscriptionCost(address token_) public view virtual returns (uint256) {
         return _getTokensPaymentModuleStorage().paymentTokensData[token_].baseSubscriptionCost;
     }
 
+    /// @inheritdoc ITokensPaymentModule
     function getAccountSavedSubscriptionCost(
         address account_,
         address token_
@@ -124,6 +131,7 @@ contract TokensPaymentModule is ITokensPaymentModule, BaseSubscriptionModule, In
             ];
     }
 
+    /// @inheritdoc ITokensPaymentModule
     function getAccountBaseSubscriptionCost(
         address account_,
         address token_
@@ -134,6 +142,7 @@ contract TokensPaymentModule is ITokensPaymentModule, BaseSubscriptionModule, In
         return accountSavedCost_ > 0 ? Math.min(accountSavedCost_, currentCost_) : currentCost_;
     }
 
+    /// @inheritdoc ITokensPaymentModule
     function isSupportedToken(address paymentToken_) public view virtual returns (bool) {
         return _getTokensPaymentModuleStorage().paymentTokens.contains(paymentToken_);
     }

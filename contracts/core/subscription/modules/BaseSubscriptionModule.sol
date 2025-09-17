@@ -2,8 +2,9 @@
 pragma solidity ^0.8.28;
 
 import {IBaseSubscriptionModule} from "../../../interfaces/core/subscription/IBaseSubscriptionModule.sol";
+import {ZeroAddressChecker} from "../../../utils/ZeroAddressChecker.sol";
 
-contract BaseSubscriptionModule is IBaseSubscriptionModule {
+contract BaseSubscriptionModule is IBaseSubscriptionModule, ZeroAddressChecker {
     bytes32 private constant BASE_SUBSCRIPTION_MODULE_STORAGE_SLOT =
         keccak256("unforgettable.contract.base.subscription.module.storage");
 
@@ -23,22 +24,27 @@ contract BaseSubscriptionModule is IBaseSubscriptionModule {
         }
     }
 
+    /// @inheritdoc IBaseSubscriptionModule
     function hasSubscription(address account_) public view virtual returns (bool) {
         return getSubscriptionStartTime(account_) > 0;
     }
 
+    /// @inheritdoc IBaseSubscriptionModule
     function hasActiveSubscription(address account_) public view virtual returns (bool) {
         return block.timestamp < getSubscriptionEndTime(account_);
     }
 
+    /// @inheritdoc IBaseSubscriptionModule
     function hasSubscriptionDebt(address account_) public view virtual returns (bool) {
         return !hasActiveSubscription(account_) && hasSubscription(account_);
     }
 
+    /// @inheritdoc IBaseSubscriptionModule
     function getSubscriptionStartTime(address account_) public view virtual returns (uint64) {
         return _getAccountSubscriptionData(account_).startTime;
     }
 
+    /// @inheritdoc IBaseSubscriptionModule
     function getSubscriptionEndTime(address account_) public view virtual returns (uint64) {
         if (!hasSubscription(account_)) {
             return uint64(block.timestamp);
@@ -66,10 +72,6 @@ contract BaseSubscriptionModule is IBaseSubscriptionModule {
 
     function _setEndTime(address account_, uint64 newEndTime_) internal virtual {
         _getAccountSubscriptionData(account_).endTime = newEndTime_;
-    }
-
-    function _checkAddress(address addr_, string memory fieldName_) internal pure {
-        require(addr_ != address(0), ZeroAddr(fieldName_));
     }
 
     function _getAccountSubscriptionData(

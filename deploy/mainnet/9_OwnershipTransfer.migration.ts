@@ -13,8 +13,13 @@ export = async (deployer: Deployer) => {
       AccountSubscriptionManager__factory,
       "AccountSubscriptionManager proxy",
     );
+    const sideChainSubscriptionManager = await deployer.deployed(
+      AccountSubscriptionManager__factory,
+      "SideChainSubscriptionManager proxy",
+    );
 
     await recoveryManager.transferOwnership(config.contractsOwner);
     await accountSubscriptionManager.transferOwnership(config.contractsOwner);
+    await sideChainSubscriptionManager.transferOwnership(config.contractsOwner);
   }
 };

@@ -50,6 +50,7 @@ contract SignatureSubscriptionModule is
         _setSubscriptionSigner(initData_.subscriptionSigner);
     }
 
+    /// @inheritdoc ISignatureSubscriptionModule
     function buySubscriptionWithSignature(
         address account_,
         uint64 duration_,
@@ -58,10 +59,12 @@ contract SignatureSubscriptionModule is
         _buySubscriptionWithSignature(msg.sender, account_, duration_, signature_);
     }
 
+    /// @inheritdoc ISignatureSubscriptionModule
     function getSubscriptionSigner() external view returns (address) {
         return _getSignatureSubscriptionModuleStorage().subscriptionSigner;
     }
 
+    /// @inheritdoc ISignatureSubscriptionModule
     function hashBuySubscription(
         address sender_,
         uint64 duration_,

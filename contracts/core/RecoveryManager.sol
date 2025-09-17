@@ -7,6 +7,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import {ADeployerGuard} from "@solarity/solidity-lib/utils/ADeployerGuard.sol";
+import {IRecoveryProvider} from "@solarity/solidity-lib/interfaces/account-abstraction/IRecoveryProvider.sol";
 
 import {IRecoveryManager} from "../interfaces/core/IRecoveryManager.sol";
 import {ISubscriptionManager} from "../interfaces/core/ISubscriptionManager.sol";
@@ -54,6 +55,7 @@ contract RecoveryManager is IRecoveryManager, ADeployerGuard, OwnableUpgradeable
         _addStrategies(recoveryStrategies_);
     }
 
+    /// @inheritdoc IRecoveryManager
     function updateSubscriptionManagers(
         address[] calldata subscriptionManagersToUpdate_,
         bool isAdding_
@@ -61,32 +63,39 @@ contract RecoveryManager is IRecoveryManager, ADeployerGuard, OwnableUpgradeable
         _updateSubscriptionManagers(subscriptionManagersToUpdate_, isAdding_);
     }
 
+    /// @inheritdoc IRecoveryManager
     function addRecoveryStrategies(address[] calldata newStrategies_) external onlyOwner {
         _addStrategies(newStrategies_);
     }
 
+    /// @inheritdoc IRecoveryManager
     function disableStrategy(uint256 strategyId_) external onlyOwner {
         _disableStrategy(strategyId_);
     }
 
+    /// @inheritdoc IRecoveryManager
     function enableStrategy(uint256 strategyId_) external onlyOwner {
         _enableStrategy(strategyId_);
     }
 
+    /// @inheritdoc IRecoveryProvider
     function subscribe(bytes memory recoveryData_) external payable {
         _subscribe(recoveryData_);
     }
 
+    /// @inheritdoc IRecoveryProvider
     function unsubscribe() external payable {
         _unsubscribe();
     }
 
+    /// @inheritdoc IRecoveryManager
     function resubscribe(bytes memory recoveryData_) external payable {
         _unsubscribe();
 
         _subscribe(recoveryData_);
     }
 
+    /// @inheritdoc IRecoveryProvider
     function recover(bytes memory object_, bytes memory proof_) external {
         RecoveryManagerStorage storage $ = _getRecoveryManagerStorage();
 
@@ -116,10 +125,12 @@ contract RecoveryManager is IRecoveryManager, ADeployerGuard, OwnableUpgradeable
         );
     }
 
+    /// @inheritdoc IRecoveryProvider
     function getRecoveryData(address account_) external view returns (bytes memory) {
         return abi.encode(getRecoveryMethods(account_));
     }
 
+    /// @inheritdoc IRecoveryManager
     function getRecoveryMethods(
         address account_
     ) public view returns (RecoveryMethod[] memory recoveryMethods_) {
@@ -137,18 +148,24 @@ contract RecoveryManager is IRecoveryManager, ADeployerGuard, OwnableUpgradeable
         }
     }
 
-    function subscriptionManagerExists(address subscriptionManager_) public view returns (bool) {
+    /// @inheritdoc IRecoveryManager
+    function subscriptionManagerExists(
+        address subscriptionManager_
+    ) public view override returns (bool) {
         return _getRecoveryManagerStorage().subscriptionManagers.contains(subscriptionManager_);
     }
 
+    /// @inheritdoc IRecoveryManager
     function getStrategyStatus(uint256 strategyId_) public view returns (StrategyStatus) {
         return _getRecoveryManagerStorage().strategiesData[strategyId_].status;
     }
 
+    /// @inheritdoc IRecoveryManager
     function getStrategy(uint256 strategyId_) public view returns (address) {
         return _getRecoveryManagerStorage().strategiesData[strategyId_].strategy;
     }
 
+    /// @inheritdoc IRecoveryManager
     function isActiveStrategy(uint256 strategyId_) public view returns (bool) {
         return getStrategyStatus(strategyId_) == StrategyStatus.Active;
     }

@@ -13,8 +13,6 @@ abstract contract ARecoveryStrategy is IRecoveryStrategy, NoncesUpgradeable {
         address recoveryManagerAddr;
     }
 
-    error NotARecoveryManager(address account);
-
     modifier onlyRecoveryManager() {
         _onlyRecoveryManager();
         _;
@@ -36,6 +34,7 @@ abstract contract ARecoveryStrategy is IRecoveryStrategy, NoncesUpgradeable {
         _getARecoveryStrategyStorage().recoveryManagerAddr = recoveryManagerAddr_;
     }
 
+    /// @inheritdoc IRecoveryStrategy
     function recoverAccount(
         address account_,
         bytes memory object_,
@@ -44,10 +43,12 @@ abstract contract ARecoveryStrategy is IRecoveryStrategy, NoncesUpgradeable {
         _recoverAccount(account_, object_, recoveryData_);
     }
 
+    /// @inheritdoc IRecoveryStrategy
     function getRecoveryManager() public view virtual returns (address) {
         return _getARecoveryStrategyStorage().recoveryManagerAddr;
     }
 
+    /// @inheritdoc IRecoveryStrategy
     function validateRecoveryData(bytes memory recoveryData_) external view {
         _validateRecoveryData(recoveryData_);
     }

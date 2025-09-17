@@ -1,4 +1,4 @@
-import { ERC20Mock, SBTMock, VaultFactoryMock, VaultSubscriptionManager } from "@ethers-v6";
+import { ERC20Mock, SBTMock, SubscriptionsSynchronizer, VaultFactoryMock, VaultSubscriptionManager } from "@ethers-v6";
 import { ETHER_ADDR, wei } from "@scripts";
 import { Reverter } from "@test-helpers";
 
@@ -6,6 +6,7 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 import { expect } from "chai";
+import { ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
 
 import { getBuySubscriptionSignature } from "../helpers/sign-utils";
@@ -31,6 +32,8 @@ describe("VaultSubscriptionManager", () => {
   let subscriptionManagerImpl: VaultSubscriptionManager;
   let subscriptionManager: VaultSubscriptionManager;
 
+  let subscriptionsSynchronizer: SubscriptionsSynchronizer;
+
   let paymentToken: ERC20Mock;
   let sbt: SBTMock;
 
@@ -54,6 +57,25 @@ describe("VaultSubscriptionManager", () => {
       "VaultSubscriptionManager",
       await subscriptionManagerProxy.getAddress(),
     );
+
+    const subscriptionsSynchronizerImpl = await ethers.deployContract("SubscriptionsSynchronizer");
+    const subscriptionsSynchronizerProxy = await ethers.deployContract("ERC1967Proxy", [
+      await subscriptionsSynchronizerImpl.getAddress(),
+      "0x",
+    ]);
+
+    subscriptionsSynchronizer = await ethers.getContractAt(
+      "SubscriptionsSynchronizer",
+      await subscriptionsSynchronizerProxy.getAddress(),
+    );
+
+    await subscriptionsSynchronizer.initialize({
+      wormholeRelayer: SECOND.address,
+      crossChainTxGasLimit: 500000n,
+      SMTMaxDepth: 80,
+      subscriptionManagers: [await subscriptionManager.getAddress()],
+      destinations: [],
+    });
 
     await subscriptionManager.initialize({
       subscriptionCreators: [],
@@ -82,6 +104,9 @@ describe("VaultSubscriptionManager", () => {
       },
       sigSubscriptionInitData: {
         subscriptionSigner: SUBSCRIPTION_SIGNER,
+      },
+      crossChainInitData: {
+        subscriptionsSynchronizer: await subscriptionsSynchronizer.getAddress(),
       },
     });
 
@@ -144,6 +169,9 @@ describe("VaultSubscriptionManager", () => {
           sigSubscriptionInitData: {
             subscriptionSigner: SUBSCRIPTION_SIGNER,
           },
+          crossChainInitData: {
+            subscriptionsSynchronizer: ZeroAddress,
+          },
         }),
       )
         .to.be.revertedWithCustomError(subscriptionManager, "OnlyDeployer")
@@ -165,6 +193,9 @@ describe("VaultSubscriptionManager", () => {
           },
           sigSubscriptionInitData: {
             subscriptionSigner: SUBSCRIPTION_SIGNER,
+          },
+          crossChainInitData: {
+            subscriptionsSynchronizer: ZeroAddress,
           },
         }),
       ).to.be.revertedWithCustomError(subscriptionManager, "InvalidInitialization");
@@ -367,6 +398,9 @@ describe("VaultSubscriptionManager", () => {
         sigSubscriptionInitData: {
           subscriptionSigner: SUBSCRIPTION_SIGNER,
         },
+        crossChainInitData: {
+          subscriptionsSynchronizer: await subscriptionsSynchronizer.getAddress(),
+        },
       });
 
       await expect(vaultFactory.callBuySubscriptionWithSBT(subscriptionManager, FIRST, sbt, FIRST, tokenId))
@@ -542,6 +576,9 @@ describe("VaultSubscriptionManager", () => {
         },
         sigSubscriptionInitData: {
           subscriptionSigner: SUBSCRIPTION_SIGNER,
+        },
+        crossChainInitData: {
+          subscriptionsSynchronizer: await subscriptionsSynchronizer.getAddress(),
         },
       });
 

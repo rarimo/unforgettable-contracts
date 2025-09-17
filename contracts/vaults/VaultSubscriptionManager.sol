@@ -56,12 +56,14 @@ contract VaultSubscriptionManager is
             initData_.subscriptionCreators,
             initData_.tokensPaymentInitData,
             initData_.sbtPaymentInitData,
-            initData_.sigSubscriptionInitData
+            initData_.sigSubscriptionInitData,
+            initData_.crossChainInitData
         );
 
         _setVaultFactory(initData_.vaultFactoryAddr);
     }
 
+    /// @inheritdoc ITokensPaymentModule
     function buySubscription(
         address vault_,
         address token_,
@@ -70,6 +72,7 @@ contract VaultSubscriptionManager is
         super.buySubscription(vault_, token_, duration_);
     }
 
+    /// @inheritdoc ISBTPaymentModule
     function buySubscriptionWithSBT(
         address vault_,
         address sbt_,
@@ -78,6 +81,7 @@ contract VaultSubscriptionManager is
         super.buySubscriptionWithSBT(vault_, sbt_, tokenId_);
     }
 
+    /// @inheritdoc IVaultSubscriptionManager
     function buySubscriptionWithSBT(
         address vault_,
         address sbt_,
@@ -87,6 +91,7 @@ contract VaultSubscriptionManager is
         _buySubscriptionWithSBT(vault_, sbt_, sbtOwner_, tokenId_);
     }
 
+    /// @inheritdoc ISignatureSubscriptionModule
     function buySubscriptionWithSignature(
         address vault_,
         uint64 duration_,
@@ -95,6 +100,7 @@ contract VaultSubscriptionManager is
         super.buySubscriptionWithSignature(vault_, duration_, signature_);
     }
 
+    /// @inheritdoc IVaultSubscriptionManager
     function buySubscriptionWithSignature(
         address sender_,
         address vault_,
@@ -104,6 +110,7 @@ contract VaultSubscriptionManager is
         _buySubscriptionWithSignature(sender_, vault_, duration_, signature_);
     }
 
+    /// @inheritdoc IVaultSubscriptionManager
     function getVaultFactory() public view returns (address) {
         return address(_getVaultSubscriptionManagerStorage().vaultFactory);
     }

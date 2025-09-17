@@ -48,6 +48,21 @@ contracts
     └── VaultSubscriptionManager — "Vault-specific subscription manager"
 ```
 
+### Vaults deployment
+
+To ensure that user vaults will always deploy at the same addresses with the same masterKey across different chains, we use the `CREATE3` approach via [CreateX](https://github.com/pcaversaccio/createx) to deploy the `VaultFactory` contract.
+
+| Contract Name            | Address                                      | Chain             |
+| ------------------------ | -------------------------------------------- | ----------------- |
+| VaultFactory             | `0x54C239E71af51Fc141A2BDf5469dc992b7256AD8` | Ethereum Mainnet  |
+| VaultSubscriptionManager | `0xdc8838478f49C212e68fD8b538B90c81D0f47621` | Ethereum Mainnet  |
+
+> [!NOTE]
+> The `VaultFactory` address will be the same on every supported chain, but other contract addresses may differ.
+
+> [!IMPORTANT]
+> We used the salt `0x00D37f35Ec44ecC4e2F54de1FA3208F73d632E5900004e6f6e204f626c697461` during deployment. This ensures that only the protocol address `0x00D37f35Ec44ecC4e2F54de1FA3208F73d632E59` can deploy the VaultFactory contract across all chains.
+
 ### Setup
 
 This project uses both Hardhat and Foundry. Follow these steps to set up the repository:

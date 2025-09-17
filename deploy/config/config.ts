@@ -11,6 +11,10 @@ export async function getConfig(): Promise<DeployConfig> {
     return validateConfig((await import("./sepolia")).deployConfig);
   }
 
+  if (hre.network.name == "ethereum") {
+    return validateConfig((await import("./ethereum")).deployConfig);
+  }
+
   throw new Error(`Config for network ${hre.network.name} is not specified`);
 }
 

@@ -44,8 +44,6 @@ contract CrossChainModule is ICrossChainModule, BaseSubscriptionModule, Initiali
     }
 
     function _setSubscriptionSynchronizer(address subscriptionSynchronizer_) internal virtual {
-        _checkAddress(subscriptionSynchronizer_, "SubscriptionsSynchronizer");
-
         _getCrossChainModuleStorage().subscriptionsSynchronizer = ISubscriptionsSynchronizer(
             subscriptionSynchronizer_
         );
@@ -59,13 +57,15 @@ contract CrossChainModule is ICrossChainModule, BaseSubscriptionModule, Initiali
     ) internal virtual override(BaseSubscriptionModule) {
         super._extendSubscription(account_, duration_);
 
-        uint64 subscriptionStartTime_ = getSubscriptionStartTime(account_);
+        if (address(_getCrossChainModuleStorage().subscriptionsSynchronizer) != address(0)) {
+            uint64 subscriptionStartTime_ = getSubscriptionStartTime(account_);
 
-        _getCrossChainModuleStorage().subscriptionsSynchronizer.saveSubscriptionData(
-            account_,
-            subscriptionStartTime_,
-            getSubscriptionEndTime(account_),
-            subscriptionStartTime_ == uint64(block.timestamp)
-        );
+            _getCrossChainModuleStorage().subscriptionsSynchronizer.saveSubscriptionData(
+                account_,
+                subscriptionStartTime_,
+                getSubscriptionEndTime(account_),
+                subscriptionStartTime_ == uint64(block.timestamp)
+            );
+        }
     }
 }

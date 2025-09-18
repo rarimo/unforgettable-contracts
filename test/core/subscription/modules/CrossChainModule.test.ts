@@ -44,18 +44,6 @@ describe("CrossChainModule", () => {
         }),
       ).to.be.revertedWithCustomError(crossChainModule, "NotInitializing");
     });
-
-    it("should get exception if try to initialize with zero address", async () => {
-      const newCrossChainModule = await ethers.deployContract("CrossChainModuleMock");
-
-      await expect(
-        newCrossChainModule.initialize({
-          subscriptionsSynchronizer: ethers.ZeroAddress,
-        }),
-      )
-        .to.be.revertedWithCustomError(newCrossChainModule, "ZeroAddr")
-        .withArgs("SubscriptionsSynchronizer");
-    });
   });
 
   describe("#setSubscriptionSynchronizer", () => {
@@ -63,12 +51,6 @@ describe("CrossChainModule", () => {
       const tx = await crossChainModule.setSubscriptionSynchronizer(FIRST);
 
       await expect(tx).to.emit(crossChainModule, "SubscriptionSynchronizerUpdated").withArgs(FIRST);
-    });
-
-    it("should get exception if try to set zero address", async () => {
-      await expect(crossChainModule.setSubscriptionSynchronizer(ethers.ZeroAddress))
-        .to.be.revertedWithCustomError(crossChainModule, "ZeroAddr")
-        .withArgs("SubscriptionsSynchronizer");
     });
   });
 
@@ -82,6 +64,33 @@ describe("CrossChainModule", () => {
       expect(await crossChainModule.getSubscriptionEndTime(FIRST)).to.be.eq(await time.latest());
       expect(await crossChainModule.hasSubscription(FIRST)).to.be.false;
       expect(await crossChainModule.hasActiveSubscription(FIRST)).to.be.false;
+
+      await time.setNextBlockTimestamp(expectedStartTime);
+      const tx = await crossChainModule.extendSubscription(FIRST, duration);
+
+      await expect(tx)
+        .to.emit(crossChainModule, "SubscriptionExtended")
+        .withArgs(FIRST.address, duration, expectedEndTime);
+
+      expect(await crossChainModule.getSubscriptionStartTime(FIRST)).to.be.eq(expectedStartTime);
+      expect(await crossChainModule.getSubscriptionEndTime(FIRST)).to.be.eq(expectedEndTime);
+      expect(await crossChainModule.hasSubscription(FIRST)).to.be.true;
+      expect(await crossChainModule.hasActiveSubscription(FIRST)).to.be.true;
+      expect(await crossChainModule.hasSubscriptionDebt(FIRST)).to.be.false;
+    });
+
+    it("should correctly extend subscription and not sync data if synchronizer is zero address", async () => {
+      const duration = 3600n * 24n * 30n;
+      const expectedStartTime = BigInt(await time.latest()) + 100n;
+      const expectedEndTime = expectedStartTime + duration;
+
+      await crossChainModule.setSubscriptionSynchronizer(ethers.ZeroAddress);
+
+      expect(await crossChainModule.getSubscriptionStartTime(FIRST)).to.be.eq(0n);
+      expect(await crossChainModule.getSubscriptionEndTime(FIRST)).to.be.eq(await time.latest());
+      expect(await crossChainModule.hasSubscription(FIRST)).to.be.false;
+      expect(await crossChainModule.hasActiveSubscription(FIRST)).to.be.false;
+      expect(await crossChainModule.hasSubscriptionDebt(FIRST)).to.be.false;
 
       await time.setNextBlockTimestamp(expectedStartTime);
       const tx = await crossChainModule.extendSubscription(FIRST, duration);

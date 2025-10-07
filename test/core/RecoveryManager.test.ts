@@ -106,6 +106,7 @@ describe("RecoveryManager", () => {
             baseSubscriptionCost: nativeSubscriptionCost,
           },
         ],
+        discountEntries: [],
       },
       sbtPaymentInitData: {
         sbtEntries: [],

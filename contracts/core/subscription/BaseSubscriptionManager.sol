@@ -174,6 +174,19 @@ abstract contract BaseSubscriptionManager is
         _setSubscriptionSynchronizer(subscriptionSynchronizer_);
     }
 
+    /**
+     * @notice A function to update SBT discount configuration for the given SBT contracts.
+     * @dev The discount value is expressed as a percentage, where `PERCENTAGE_100` represents 100%.
+     * @param discountEntries_ An array of SBT discount update entries.
+     */
+    function updateSBTDiscounts(
+        SBTDiscountUpdateEntry[] calldata discountEntries_
+    ) public virtual onlyOwner {
+        for (uint256 i = 0; i < discountEntries_.length; ++i) {
+            _updateDiscount(discountEntries_[i].sbtAddr, discountEntries_[i].discount);
+        }
+    }
+
     /// @inheritdoc ISubscriptionManager
     function createSubscription(address account_) public virtual onlySubscriptionCreator {
         _createSubscription(account_);
@@ -193,6 +206,23 @@ abstract contract BaseSubscriptionManager is
         whenNotPaused
     {
         super.buySubscription(account_, token_, duration_);
+    }
+
+    /// @inheritdoc ITokensPaymentModule
+    function buySubscriptionWithDiscount(
+        address account_,
+        address token_,
+        uint64 duration_,
+        DiscountData memory discount_
+    )
+        public
+        payable
+        virtual
+        override(TokensPaymentModule, ITokensPaymentModule)
+        nonReentrant
+        whenNotPaused
+    {
+        super.buySubscriptionWithDiscount(account_, token_, duration_, discount_);
     }
 
     /// @inheritdoc ISBTPaymentModule

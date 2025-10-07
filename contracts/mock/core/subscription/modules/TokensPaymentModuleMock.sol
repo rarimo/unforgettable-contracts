@@ -16,6 +16,10 @@ contract TokensPaymentModuleMock is TokensPaymentModule {
         _updateDurationFactor(duration_, factor_);
     }
 
+    function updateDiscount(address sbt_, uint256 discount_) external {
+        _updateDiscount(sbt_, discount_);
+    }
+
     function withdrawTokens(address tokenAddr_, address to_, uint256 amount_) external {
         _withdrawTokens(tokenAddr_, to_, amount_);
     }

@@ -6,7 +6,6 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 import { expect } from "chai";
-import { ZeroAddress } from "ethers";
 import { ethers } from "hardhat";
 
 import {
@@ -92,6 +91,7 @@ describe("Vault", () => {
             baseSubscriptionCost: nativeSubscriptionCost,
           },
         ],
+        discountEntries: [],
       },
       sbtPaymentInitData: {
         sbtEntries: [],

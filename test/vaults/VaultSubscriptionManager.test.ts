@@ -1,5 +1,5 @@
 import { ERC20Mock, SBTMock, SubscriptionsSynchronizer, VaultFactoryMock, VaultSubscriptionManager } from "@ethers-v6";
-import { ETHER_ADDR, wei } from "@scripts";
+import { ETHER_ADDR, PERCENTAGE_100, wei } from "@scripts";
 import { Reverter } from "@test-helpers";
 
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
@@ -93,6 +93,7 @@ describe("VaultSubscriptionManager", () => {
             baseSubscriptionCost: paymentTokenSubscriptionCost,
           },
         ],
+        discountEntries: [],
       },
       sbtPaymentInitData: {
         sbtEntries: [
@@ -162,6 +163,7 @@ describe("VaultSubscriptionManager", () => {
             basePaymentPeriod: basePaymentPeriod,
             durationFactorEntries: [],
             paymentTokenEntries: [],
+            discountEntries: [],
           },
           sbtPaymentInitData: {
             sbtEntries: [],
@@ -187,6 +189,7 @@ describe("VaultSubscriptionManager", () => {
             basePaymentPeriod: basePaymentPeriod,
             durationFactorEntries: [],
             paymentTokenEntries: [],
+            discountEntries: [],
           },
           sbtPaymentInitData: {
             sbtEntries: [],
@@ -271,6 +274,58 @@ describe("VaultSubscriptionManager", () => {
 
     it("should get exception if passed account is not a vault", async () => {
       await expect(subscriptionManager.connect(FIRST).buySubscription(SECOND, ETHER_ADDR, basePaymentPeriod))
+        .to.be.revertedWithCustomError(subscriptionManager, "NotAVault")
+        .withArgs(SECOND.address);
+    });
+  });
+
+  describe("#buySubscriptionWithDiscount", () => {
+    beforeEach("setup", async () => {
+      await vaultFactory.setVaultName(FIRST, defaultVaultName);
+    });
+
+    it("should correctly buy subscription for 2 base periods with discount", async () => {
+      const discountSBT = await ethers.deployContract("SBTMock");
+
+      await discountSBT.initialize("DiscountSBT", "DSBT", [OWNER]);
+
+      const discount = PERCENTAGE_100 / 2n;
+
+      await subscriptionManager.updateSBTDiscounts([
+        {
+          sbtAddr: await discountSBT.getAddress(),
+          discount: discount,
+        },
+      ]);
+
+      await discountSBT.connect(OWNER).mint(FIRST, 0);
+
+      const duration = basePaymentPeriod * 2n;
+
+      await paymentToken.mint(FIRST, paymentTokenSubscriptionCost);
+      await paymentToken.connect(FIRST).approve(subscriptionManager, paymentTokenSubscriptionCost);
+
+      const startTime = (await time.latest()) + 100;
+
+      await time.setNextBlockTimestamp(startTime);
+      const tx = await subscriptionManager
+        .connect(FIRST)
+        .buySubscriptionWithDiscount(paymentToken, duration, discountSBT);
+
+      await expect(tx)
+        .to.emit(subscriptionManager, "SubscriptionBoughtWithToken")
+        .withArgs(await paymentToken.getAddress(), FIRST, paymentTokenSubscriptionCost);
+      await expect(tx).to.changeTokenBalances(
+        paymentToken,
+        [FIRST, subscriptionManager],
+        [-paymentTokenSubscriptionCost, paymentTokenSubscriptionCost],
+      );
+    });
+
+    it("should get exception if passed account is not a vault", async () => {
+      await expect(
+        subscriptionManager.connect(SECOND).buySubscriptionWithDiscount(ETHER_ADDR, basePaymentPeriod, paymentToken),
+      )
         .to.be.revertedWithCustomError(subscriptionManager, "NotAVault")
         .withArgs(SECOND.address);
     });
@@ -386,6 +441,7 @@ describe("VaultSubscriptionManager", () => {
           basePaymentPeriod: basePaymentPeriod,
           durationFactorEntries: [],
           paymentTokenEntries: [],
+          discountEntries: [],
         },
         sbtPaymentInitData: {
           sbtEntries: [
@@ -565,6 +621,7 @@ describe("VaultSubscriptionManager", () => {
           basePaymentPeriod: basePaymentPeriod,
           durationFactorEntries: [],
           paymentTokenEntries: [],
+          discountEntries: [],
         },
         sbtPaymentInitData: {
           sbtEntries: [

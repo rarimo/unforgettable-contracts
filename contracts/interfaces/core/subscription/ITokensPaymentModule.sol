@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {IBaseSubscriptionModule} from "./IBaseSubscriptionModule.sol";
+import {ISBTDiscountModule} from "./ISBTDiscountModule.sol";
 
 /**
  * @title ITokensPaymentModule
@@ -34,11 +35,13 @@ interface ITokensPaymentModule is IBaseSubscriptionModule {
      * @param basePaymentPeriod Base subscription billing period used for subscription cost calculation.
      * @param paymentTokenEntries List of payment tokens and their base subscription costs.
      * @param durationFactorEntries List of duration-based factors to adjust subscription pricing.
+     * @param discountEntries List of discount SBTs and their discount percentage value.
      */
     struct TokensPaymentModuleInitData {
         uint64 basePaymentPeriod;
         PaymentTokenUpdateEntry[] paymentTokenEntries;
         DurationFactorUpdateEntry[] durationFactorEntries;
+        ISBTDiscountModule.SBTDiscountUpdateEntry[] discountEntries;
     }
 
     /**
@@ -148,6 +151,19 @@ interface ITokensPaymentModule is IBaseSubscriptionModule {
     ) external payable;
 
     /**
+     * @notice A function to buy a subscription for the caller using a supported payment token with discount.
+     * @param paymentToken_ The address of the ERC-20 token used for payment.
+              Use `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE` to pay in ETH.
+     * @param duration_ Duration in seconds for which to extended the subscription.
+     * @param discountSBT_ The SBT address used to apply a discount.
+     */
+    function buySubscriptionWithDiscount(
+        address paymentToken_,
+        uint64 duration_,
+        address discountSBT_
+    ) external payable;
+
+    /**
      * @notice A function to retrieve the base payment period used for subscription calculations.
      * @return Base payment period in seconds.
      */
@@ -178,6 +194,22 @@ interface ITokensPaymentModule is IBaseSubscriptionModule {
         address paymentToken_,
         uint64 duration_
     ) external view returns (uint256 totalCost_);
+
+    /**
+     * @notice A function to compute the total subscription cost
+     *         for a given account, token, and duration after applying an SBT-based discount.
+     * @param account_ Account address for which to calculate the subscription cost.
+     * @param paymentToken_ The token address to be used for payment.
+     * @param duration_ Subscription duration.
+     * @param discountSBT_ The address of the SBT contract providing the discount.
+     * @return totalCost_ Total discounted subscription cost in token units.
+     */
+    function getSubscriptionCostWithDiscount(
+        address account_,
+        address paymentToken_,
+        uint64 duration_,
+        address discountSBT_
+    ) external view returns (uint256);
 
     /**
      * @notice A function to retrieve the base subscription cost for a provided token.

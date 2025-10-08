@@ -105,6 +105,7 @@ describe("VaultFactory", () => {
             baseSubscriptionCost: paymentTokenSubscriptionCost,
           },
         ],
+        discountEntries: [],
       },
       sbtPaymentInitData: {
         sbtEntries: [

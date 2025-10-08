@@ -13,8 +13,14 @@ import {ITokensPaymentModule} from "../../../interfaces/core/subscription/IToken
 import {TokensHelper} from "../../../libs/TokensHelper.sol";
 
 import {BaseSubscriptionModule} from "./BaseSubscriptionModule.sol";
+import {SBTDiscountModule} from "./SBTDiscountModule.sol";
 
-contract TokensPaymentModule is ITokensPaymentModule, BaseSubscriptionModule, Initializable {
+contract TokensPaymentModule is
+    ITokensPaymentModule,
+    BaseSubscriptionModule,
+    SBTDiscountModule,
+    Initializable
+{
     using EnumerableSet for EnumerableSet.AddressSet;
     using TokensHelper for address;
 
@@ -63,6 +69,13 @@ contract TokensPaymentModule is ITokensPaymentModule, BaseSubscriptionModule, In
                 initData_.durationFactorEntries[i].factor
             );
         }
+
+        for (uint256 i = 0; i < initData_.discountEntries.length; ++i) {
+            _updateDiscount(
+                initData_.discountEntries[i].sbtAddr,
+                initData_.discountEntries[i].discount
+            );
+        }
     }
 
     /// @inheritdoc ITokensPaymentModule
@@ -71,7 +84,18 @@ contract TokensPaymentModule is ITokensPaymentModule, BaseSubscriptionModule, In
         address token_,
         uint64 duration_
     ) public payable virtual onlySupportedToken(token_) {
-        _buySubscription(msg.sender, account_, token_, duration_);
+        _buySubscription(msg.sender, account_, token_, duration_, address(0));
+    }
+
+    /// @inheritdoc ITokensPaymentModule
+    function buySubscriptionWithDiscount(
+        address token_,
+        uint64 duration_,
+        address discountSBT_
+    ) public payable virtual onlySupportedToken(token_) {
+        _validateDiscount(discountSBT_, msg.sender);
+
+        _buySubscription(msg.sender, msg.sender, token_, duration_, discountSBT_);
     }
 
     /// @inheritdoc ITokensPaymentModule
@@ -113,6 +137,18 @@ contract TokensPaymentModule is ITokensPaymentModule, BaseSubscriptionModule, In
         }
 
         return _applyDurationFactor(account_, duration_, totalCost_);
+    }
+
+    /// @inheritdoc ITokensPaymentModule
+    function getSubscriptionCostWithDiscount(
+        address account_,
+        address token_,
+        uint64 duration_,
+        address discountSBT_
+    ) public view onlySupportedToken(token_) returns (uint256) {
+        uint256 totalCost_ = getSubscriptionCost(account_, token_, duration_);
+
+        return _applyDiscount(totalCost_, getDiscount(discountSBT_));
     }
 
     /// @inheritdoc ITokensPaymentModule
@@ -215,11 +251,17 @@ contract TokensPaymentModule is ITokensPaymentModule, BaseSubscriptionModule, In
         address buyer_,
         address account_,
         address token_,
-        uint64 duration_
+        uint64 duration_,
+        address discountSBT_
     ) internal virtual {
         require(duration_ >= getBasePaymentPeriod(), InvalidSubscriptionDuration(duration_));
 
-        uint256 totalCost_ = getSubscriptionCost(account_, token_, duration_);
+        uint256 totalCost_ = getSubscriptionCostWithDiscount(
+            account_,
+            token_,
+            duration_,
+            discountSBT_
+        );
 
         _updateAccountTokenSubscriptionCost(account_, token_);
 

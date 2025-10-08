@@ -5,7 +5,7 @@ import {
   SBTMock,
   SubscriptionsSynchronizer,
 } from "@ethers-v6";
-import { ETHER_ADDR, wei } from "@scripts";
+import { ETHER_ADDR, PERCENTAGE_100, wei } from "@scripts";
 import { Reverter } from "@test-helpers";
 
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
@@ -96,6 +96,7 @@ describe("AccountSubscriptionManager", () => {
             baseSubscriptionCost: paymentTokenSubscriptionCost,
           },
         ],
+        discountEntries: [],
       },
       sbtPaymentInitData: {
         sbtEntries: [
@@ -163,6 +164,7 @@ describe("AccountSubscriptionManager", () => {
             basePaymentPeriod: basePaymentPeriod,
             durationFactorEntries: [],
             paymentTokenEntries: [],
+            discountEntries: [],
           },
           sbtPaymentInitData: {
             sbtEntries: [],
@@ -187,6 +189,7 @@ describe("AccountSubscriptionManager", () => {
             basePaymentPeriod: basePaymentPeriod,
             durationFactorEntries: [],
             paymentTokenEntries: [],
+            discountEntries: [],
           },
           sbtPaymentInitData: {
             sbtEntries: [],
@@ -209,6 +212,7 @@ describe("AccountSubscriptionManager", () => {
             basePaymentPeriod: basePaymentPeriod,
             durationFactorEntries: [],
             paymentTokenEntries: [],
+            discountEntries: [],
           },
           {
             sbtEntries: [],
@@ -543,6 +547,44 @@ describe("AccountSubscriptionManager", () => {
     });
   });
 
+  describe("#updateSBTDiscounts", () => {
+    it("should update sbt discounts correctly", async () => {
+      const discountSBT1 = await (await ethers.deployContract("SBTMock")).getAddress();
+      const discountSBT2 = await (await ethers.deployContract("SBTMock")).getAddress();
+
+      const discountEntries = [
+        {
+          sbtAddr: await discountSBT1,
+          discount: PERCENTAGE_100 / 2n,
+        },
+        {
+          sbtAddr: await discountSBT2,
+          discount: PERCENTAGE_100 / 5n,
+        },
+      ];
+
+      const tx = await subscriptionManager.updateSBTDiscounts(discountEntries);
+
+      expect(await subscriptionManager.getDiscountSBTs(sbt)).to.be.deep.eq([discountSBT1, discountSBT2]);
+      expect(await subscriptionManager.getDiscount(discountSBT1)).to.be.eq(PERCENTAGE_100 / 2n);
+      expect(await subscriptionManager.getDiscount(discountSBT2)).to.be.eq(PERCENTAGE_100 / 5n);
+
+      await expect(tx)
+        .to.emit(subscriptionManager, "DiscountUpdated")
+        .withArgs(discountSBT1, PERCENTAGE_100 / 2n);
+
+      await expect(tx)
+        .to.emit(subscriptionManager, "DiscountUpdated")
+        .withArgs(discountSBT2, PERCENTAGE_100 / 5n);
+    });
+
+    it("should get exception if not an owner try to call this function", async () => {
+      await expect(subscriptionManager.connect(FIRST).updateSBTDiscounts([]))
+        .to.be.revertedWithCustomError(subscriptionManager, "OwnableUnauthorizedAccount")
+        .withArgs(FIRST.address);
+    });
+  });
+
   describe("#addSubscriptionCreators", async () => {
     it("should correctly add new subscription creator", async () => {
       const tx = await subscriptionManager.addSubscriptionCreators([FIRST]);
@@ -739,6 +781,57 @@ describe("AccountSubscriptionManager", () => {
       await subscriptionManager.pause();
 
       await expect(subscriptionManager.connect(FIRST).buySubscription(FIRST, ETHER_ADDR, basePaymentPeriod))
+        .to.be.revertedWithCustomError(subscriptionManager, "EnforcedPause")
+        .withArgs();
+    });
+  });
+
+  describe("#buySubscriptionWithDiscount", () => {
+    it("should correctly buy subscription for 2 base periods with discount", async () => {
+      const discountSBT = await ethers.deployContract("SBTMock");
+
+      await discountSBT.initialize("DiscountSBT", "DSBT", [OWNER]);
+
+      const discount = PERCENTAGE_100 / 5n;
+
+      await subscriptionManager.updateSBTDiscounts([
+        {
+          sbtAddr: await discountSBT.getAddress(),
+          discount: discount,
+        },
+      ]);
+
+      await discountSBT.connect(OWNER).mint(FIRST, 1);
+
+      const duration = basePaymentPeriod * 10n;
+      const expectedCost = (paymentTokenSubscriptionCost * 10n * (PERCENTAGE_100 - discount)) / PERCENTAGE_100;
+
+      await paymentToken.mint(FIRST, expectedCost);
+      await paymentToken.connect(FIRST).approve(subscriptionManager, expectedCost);
+
+      const startTime = (await time.latest()) + 100;
+
+      await time.setNextBlockTimestamp(startTime);
+      const tx = await subscriptionManager
+        .connect(FIRST)
+        .buySubscriptionWithDiscount(paymentToken, duration, discountSBT);
+
+      await expect(tx)
+        .to.emit(subscriptionManager, "SubscriptionBoughtWithToken")
+        .withArgs(await paymentToken.getAddress(), FIRST, expectedCost);
+      await expect(tx).to.changeTokenBalances(
+        paymentToken,
+        [FIRST, subscriptionManager],
+        [-expectedCost, expectedCost],
+      );
+    });
+
+    it("should get exception if paused", async () => {
+      await subscriptionManager.pause();
+
+      await expect(
+        subscriptionManager.connect(FIRST).buySubscriptionWithDiscount(ETHER_ADDR, basePaymentPeriod, paymentToken),
+      )
         .to.be.revertedWithCustomError(subscriptionManager, "EnforcedPause")
         .withArgs();
     });

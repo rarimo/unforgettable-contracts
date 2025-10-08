@@ -1,5 +1,5 @@
 import { ETHER_ADDR, PERCENTAGE_100, PRECISION, wei } from "@/scripts";
-import { ERC20Mock, TokensPaymentModuleMock } from "@ethers-v6";
+import { ERC20Mock, SBTMock, TokensPaymentModuleMock } from "@ethers-v6";
 import { Reverter } from "@test-helpers";
 
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
@@ -26,11 +26,17 @@ describe("TokensPaymentModule", () => {
   let paymentToken: ERC20Mock;
   let tokensPaymentModule: TokensPaymentModuleMock;
 
+  let discountSBT: SBTMock;
+
   beforeEach(async () => {
     [OWNER, FIRST] = await ethers.getSigners();
 
     paymentToken = await ethers.deployContract("ERC20Mock", ["Test Token", "TT", 18]);
     tokensPaymentModule = await ethers.deployContract("TokensPaymentModuleMock");
+
+    discountSBT = await ethers.deployContract("SBTMock");
+
+    await discountSBT.initialize("DiscountSBT", "DSBT", [OWNER]);
 
     await tokensPaymentModule.initialize({
       basePaymentPeriod: basePaymentPeriod,
@@ -48,6 +54,12 @@ describe("TokensPaymentModule", () => {
         {
           duration: oneYear,
           factor: oneYearFactor,
+        },
+      ],
+      discountEntries: [
+        {
+          sbtAddr: discountSBT,
+          discount: PERCENTAGE_100 / 2n,
         },
       ],
     });
@@ -75,6 +87,9 @@ describe("TokensPaymentModule", () => {
       );
 
       expect(await tokensPaymentModule.getSubscriptionDurationFactor(oneYear)).to.be.eq(oneYearFactor);
+
+      expect(await tokensPaymentModule.getDiscountSBTs()).to.be.deep.eq([await discountSBT.getAddress()]);
+      expect(await tokensPaymentModule.getDiscount(discountSBT)).to.be.eq(PERCENTAGE_100 / 2n);
     });
 
     it("should get exception if try to call init function directly", async () => {
@@ -83,6 +98,7 @@ describe("TokensPaymentModule", () => {
           basePaymentPeriod: basePaymentPeriod / 12n,
           paymentTokenEntries: [],
           durationFactorEntries: [],
+          discountEntries: [],
         }),
       ).to.be.revertedWithCustomError(tokensPaymentModule, "NotInitializing");
     });
@@ -120,6 +136,52 @@ describe("TokensPaymentModule", () => {
       expect(await tokensPaymentModule.getSubscriptionDurationFactor(oneYear)).to.be.eq(0n);
 
       await expect(tx).to.emit(tokensPaymentModule, "SubscriptionDurationFactorUpdated").withArgs(oneYear, 0n);
+    });
+  });
+
+  describe("#updateDiscount", async () => {
+    it("should correctly update discounts", async () => {
+      let tx = await tokensPaymentModule.updateDiscount(paymentToken, 200);
+
+      await expect(tx)
+        .to.emit(tokensPaymentModule, "DiscountUpdated")
+        .withArgs(await paymentToken.getAddress(), 200);
+
+      expect(await tokensPaymentModule.getDiscountSBTs()).to.be.deep.eq([
+        await discountSBT.getAddress(),
+        await paymentToken.getAddress(),
+      ]);
+      expect(await tokensPaymentModule.getDiscount(paymentToken)).to.be.eq(200);
+      expect(await tokensPaymentModule.getDiscount(discountSBT)).to.be.eq(PERCENTAGE_100 / 2n);
+
+      tx = await tokensPaymentModule.updateDiscount(discountSBT, 350n);
+
+      await expect(tx)
+        .to.emit(tokensPaymentModule, "DiscountUpdated")
+        .withArgs(await discountSBT.getAddress(), 350);
+
+      expect(await tokensPaymentModule.getDiscountSBTs()).to.be.deep.eq([
+        await discountSBT.getAddress(),
+        await paymentToken.getAddress(),
+      ]);
+      expect(await tokensPaymentModule.getDiscount(paymentToken)).to.be.eq(200);
+      expect(await tokensPaymentModule.getDiscount(discountSBT)).to.be.eq(350);
+
+      tx = await tokensPaymentModule.updateDiscount(discountSBT, 0);
+
+      await expect(tx)
+        .to.emit(tokensPaymentModule, "DiscountUpdated")
+        .withArgs(await discountSBT.getAddress(), 0);
+
+      expect(await tokensPaymentModule.getDiscountSBTs()).to.be.deep.eq([await paymentToken.getAddress()]);
+      expect(await tokensPaymentModule.getDiscount(paymentToken)).to.be.eq(200);
+      expect(await tokensPaymentModule.getDiscount(discountSBT)).to.be.eq(0);
+    });
+
+    it("should get exception if try to set invalid discount", async () => {
+      await expect(tokensPaymentModule.updateDiscount(discountSBT, PERCENTAGE_100 * 2n))
+        .to.be.revertedWithCustomError(tokensPaymentModule, "InvalidDiscountValue")
+        .withArgs(PERCENTAGE_100 * 2n);
     });
   });
 
@@ -433,6 +495,142 @@ describe("TokensPaymentModule", () => {
     });
   });
 
+  describe("#buySubscriptionWithDiscount", () => {
+    it("should correctly buy subscription with native token with discount", async () => {
+      const duration = basePaymentPeriod * 4n;
+      const expectedCost = await tokensPaymentModule.getSubscriptionCostWithDiscount(
+        OWNER,
+        ETHER_ADDR,
+        duration,
+        discountSBT,
+      );
+
+      const startTime = BigInt((await time.latest()) + 100);
+      const expectedEndTime = startTime + duration;
+
+      expect(await ethers.provider.getBalance(tokensPaymentModule)).to.be.eq(0n);
+
+      await discountSBT.connect(OWNER).mint(OWNER, 2);
+
+      await time.setNextBlockTimestamp(startTime);
+      const tx = await tokensPaymentModule
+        .connect(OWNER)
+        .buySubscriptionWithDiscount(ETHER_ADDR, duration, discountSBT, {
+          value: expectedCost,
+        });
+
+      expect(await ethers.provider.getBalance(tokensPaymentModule)).to.be.eq(expectedCost);
+
+      await expect(tx)
+        .to.emit(tokensPaymentModule, "SubscriptionExtended")
+        .withArgs(OWNER.address, duration, expectedEndTime);
+      await expect(tx)
+        .to.emit(tokensPaymentModule, "SubscriptionBoughtWithToken")
+        .withArgs(ETHER_ADDR, OWNER.address, expectedCost);
+    });
+
+    it("should correctly buy subscription with ERC20 token with discount", async () => {
+      const duration = basePaymentPeriod * 2n;
+      const expectedCost = await tokensPaymentModule.getSubscriptionCostWithDiscount(
+        OWNER,
+        paymentToken,
+        duration,
+        discountSBT,
+      );
+
+      await paymentToken.connect(OWNER).approve(tokensPaymentModule, expectedCost);
+
+      const startTime = BigInt((await time.latest()) + 100);
+      const expectedEndTime = startTime + duration;
+
+      await discountSBT.connect(OWNER).mint(OWNER, 1);
+
+      await time.setNextBlockTimestamp(startTime);
+      const tx = await tokensPaymentModule
+        .connect(OWNER)
+        .buySubscriptionWithDiscount(paymentToken, duration, discountSBT);
+
+      await expect(tx)
+        .to.emit(tokensPaymentModule, "SubscriptionExtended")
+        .withArgs(OWNER.address, duration, expectedEndTime);
+      await expect(tx)
+        .to.emit(tokensPaymentModule, "SubscriptionBoughtWithToken")
+        .withArgs(await paymentToken.getAddress(), OWNER.address, expectedCost);
+
+      expect(await paymentToken.balanceOf(tokensPaymentModule)).to.be.eq(expectedCost);
+      expect(await paymentToken.balanceOf(OWNER)).to.be.eq(initialTokensAmount - expectedCost);
+    });
+
+    it("should correctly buy subscription with 100% discount", async () => {
+      const discountSBT = await ethers.deployContract("SBTMock");
+
+      await discountSBT.initialize("DiscountSBT", "DSBT", [OWNER]);
+
+      await tokensPaymentModule.updateDiscount(discountSBT, PERCENTAGE_100);
+
+      const duration = basePaymentPeriod * 2n;
+      const expectedCost = await tokensPaymentModule.getSubscriptionCostWithDiscount(
+        FIRST,
+        paymentToken,
+        duration,
+        discountSBT,
+      );
+
+      expect(expectedCost).to.be.eq(0);
+
+      const startTime = BigInt((await time.latest()) + 100);
+      const expectedEndTime = startTime + duration;
+
+      await discountSBT.connect(OWNER).mint(FIRST, 1);
+
+      await time.setNextBlockTimestamp(startTime);
+      const tx = await tokensPaymentModule
+        .connect(FIRST)
+        .buySubscriptionWithDiscount(paymentToken, duration, discountSBT);
+
+      await expect(tx)
+        .to.emit(tokensPaymentModule, "SubscriptionExtended")
+        .withArgs(FIRST.address, duration, expectedEndTime);
+      await expect(tx)
+        .to.emit(tokensPaymentModule, "SubscriptionBoughtWithToken")
+        .withArgs(await paymentToken.getAddress(), FIRST.address, expectedCost);
+
+      expect(await paymentToken.balanceOf(tokensPaymentModule)).to.be.eq(expectedCost);
+      expect(await paymentToken.balanceOf(FIRST)).to.be.eq(initialTokensAmount);
+    });
+
+    it("should get exception if pass unsupported discount SBT", async () => {
+      await expect(
+        tokensPaymentModule
+          .connect(OWNER)
+          .buySubscriptionWithDiscount(paymentToken, basePaymentPeriod * 2n, paymentToken),
+      )
+        .to.be.revertedWithCustomError(tokensPaymentModule, "InvalidDiscountSBT")
+        .withArgs(await paymentToken.getAddress());
+    });
+
+    it("should get exception if the caller is not the owner of the discount SBT", async () => {
+      await expect(
+        tokensPaymentModule
+          .connect(FIRST)
+          .buySubscriptionWithDiscount(paymentToken, basePaymentPeriod * 2n, discountSBT),
+      )
+        .to.be.revertedWithCustomError(tokensPaymentModule, "NotADiscountSBTOwner")
+        .withArgs(await discountSBT.getAddress(), FIRST.address);
+    });
+
+    it("should get exception if pass unsupported payment token", async () => {
+      const unsupportedToken = await ethers.deployContract("ERC20Mock", ["Unsupported Token", "UT", 18]);
+      const duration = basePaymentPeriod * 2n;
+
+      await expect(
+        tokensPaymentModule.connect(FIRST).buySubscriptionWithDiscount(unsupportedToken, duration, discountSBT),
+      )
+        .to.be.revertedWithCustomError(tokensPaymentModule, "TokenNotSupported")
+        .withArgs(await unsupportedToken.getAddress());
+    });
+  });
+
   describe("#getSubscriptionCost", () => {
     it("should correctly count subscription cost for different periods", async () => {
       let duration = basePaymentPeriod * 3n;
@@ -542,6 +740,34 @@ describe("TokensPaymentModule", () => {
 
     it("should get exception if pass unsupported token address", async () => {
       await expect(tokensPaymentModule.getSubscriptionCost(FIRST, FIRST, basePaymentPeriod))
+        .to.be.revertedWithCustomError(tokensPaymentModule, "TokenNotSupported")
+        .withArgs(await FIRST.getAddress());
+    });
+  });
+
+  describe("#getSubscriptionCostWithDiscount", () => {
+    it("should correctly count subscription cost with discount", async () => {
+      let duration = basePaymentPeriod * 3n;
+      let expectedCost = (paymentTokenSubscriptionCost * 3n) / 2n;
+
+      expect(
+        await tokensPaymentModule.getSubscriptionCostWithDiscount(FIRST, paymentToken, duration, discountSBT),
+      ).to.be.eq(expectedCost);
+
+      duration = basePaymentPeriod * 5n + basePaymentPeriod / 2n;
+      expectedCost = (paymentTokenSubscriptionCost * 5n + paymentTokenSubscriptionCost / 2n) / 2n;
+
+      expect(
+        await tokensPaymentModule.getSubscriptionCostWithDiscount(FIRST, paymentToken, duration, discountSBT),
+      ).to.be.eq(expectedCost);
+
+      expect(
+        await tokensPaymentModule.getSubscriptionCostWithDiscount(FIRST, paymentToken, duration, paymentToken),
+      ).to.be.eq(expectedCost * 2n);
+    });
+
+    it("should get exception if pass unsupported token address", async () => {
+      await expect(tokensPaymentModule.getSubscriptionCostWithDiscount(FIRST, FIRST, basePaymentPeriod, discountSBT))
         .to.be.revertedWithCustomError(tokensPaymentModule, "TokenNotSupported")
         .withArgs(await FIRST.getAddress());
     });

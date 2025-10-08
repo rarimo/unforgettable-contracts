@@ -192,6 +192,7 @@ describe("UnforgettableRecoveryModule", () => {
             baseSubscriptionCost: paymentTokenSubscriptionCost,
           },
         ],
+        discountEntries: [],
       },
       sbtPaymentInitData: {
         sbtEntries: [],

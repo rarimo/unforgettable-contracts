@@ -24,6 +24,7 @@ contracts
 │   │   ├── modules
 │   │   │   ├── BaseSubscriptionModule — "Basic subscription extension logic"
 │   │   │   ├── CrossChainModule — "Crosschain subscription synchronization module"
+│   │   │   ├── SBTDiscountModule — "Subscription discounts based on ownership of supported SBTs"
 │   │   │   ├── SBTPaymentModule — "Subscription payments using SBTs mapped to fixed durations"
 │   │   │   ├── SignatureSubscriptionModule — "Subscription extension using signed EIP-712 permits"
 │   │   │   └── TokensPaymentModule — "Subscription payments in ETH or ERC-20 tokens"

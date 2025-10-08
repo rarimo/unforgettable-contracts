@@ -74,12 +74,16 @@ contract VaultSubscriptionManager is
 
     /// @inheritdoc ITokensPaymentModule
     function buySubscriptionWithDiscount(
-        address vault_,
         address token_,
         uint64 duration_,
-        DiscountData memory discount_
-    ) public payable override(BaseSubscriptionManager, ITokensPaymentModule) onlyVault(vault_) {
-        super.buySubscriptionWithDiscount(vault_, token_, duration_, discount_);
+        address discountSBT_
+    )
+        public
+        payable
+        override(BaseSubscriptionManager, ITokensPaymentModule)
+        onlyVault(msg.sender)
+    {
+        super.buySubscriptionWithDiscount(token_, duration_, discountSBT_);
     }
 
     /// @inheritdoc ISBTPaymentModule

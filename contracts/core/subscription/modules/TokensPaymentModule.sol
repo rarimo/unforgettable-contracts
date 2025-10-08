@@ -89,14 +89,13 @@ contract TokensPaymentModule is
 
     /// @inheritdoc ITokensPaymentModule
     function buySubscriptionWithDiscount(
-        address account_,
         address token_,
         uint64 duration_,
-        DiscountData memory discount_
+        address discountSBT_
     ) public payable virtual onlySupportedToken(token_) {
-        _validateDiscount(discount_);
+        _validateDiscount(discountSBT_, msg.sender);
 
-        _buySubscription(msg.sender, account_, token_, duration_, discount_.sbtAddr);
+        _buySubscription(msg.sender, msg.sender, token_, duration_, discountSBT_);
     }
 
     /// @inheritdoc ITokensPaymentModule

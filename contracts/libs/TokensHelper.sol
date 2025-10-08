@@ -39,7 +39,9 @@ library TokensHelper {
                 Address.sendValue(payable(from_), extraValue_);
             }
         } else {
-            IERC20(tokenAddr_).safeTransferFrom(from_, address(this), amount_);
+            if (amount_ > 0) {
+                IERC20(tokenAddr_).safeTransferFrom(from_, address(this), amount_);
+            }
         }
     }
 

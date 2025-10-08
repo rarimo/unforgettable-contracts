@@ -298,43 +298,33 @@ describe("VaultSubscriptionManager", () => {
         },
       ]);
 
-      await discountSBT.connect(OWNER).mint(OWNER, 0);
-
-      const discountData = {
-        sbtAddr: await discountSBT.getAddress(),
-        tokenId: 0,
-      };
+      await discountSBT.connect(OWNER).mint(FIRST, 0);
 
       const duration = basePaymentPeriod * 2n;
 
-      await paymentToken.mint(OWNER, paymentTokenSubscriptionCost);
-      await paymentToken.approve(subscriptionManager, paymentTokenSubscriptionCost);
+      await paymentToken.mint(FIRST, paymentTokenSubscriptionCost);
+      await paymentToken.connect(FIRST).approve(subscriptionManager, paymentTokenSubscriptionCost);
 
       const startTime = (await time.latest()) + 100;
 
       await time.setNextBlockTimestamp(startTime);
-      const tx = await subscriptionManager.buySubscriptionWithDiscount(FIRST, paymentToken, duration, discountData);
+      const tx = await subscriptionManager
+        .connect(FIRST)
+        .buySubscriptionWithDiscount(paymentToken, duration, discountSBT);
 
       await expect(tx)
         .to.emit(subscriptionManager, "SubscriptionBoughtWithToken")
-        .withArgs(await paymentToken.getAddress(), OWNER, paymentTokenSubscriptionCost);
+        .withArgs(await paymentToken.getAddress(), FIRST, paymentTokenSubscriptionCost);
       await expect(tx).to.changeTokenBalances(
         paymentToken,
-        [OWNER, subscriptionManager],
+        [FIRST, subscriptionManager],
         [-paymentTokenSubscriptionCost, paymentTokenSubscriptionCost],
       );
     });
 
     it("should get exception if passed account is not a vault", async () => {
-      const discountData = {
-        sbtAddr: await paymentToken.getAddress(),
-        tokenId: 1,
-      };
-
       await expect(
-        subscriptionManager
-          .connect(FIRST)
-          .buySubscriptionWithDiscount(SECOND, ETHER_ADDR, basePaymentPeriod, discountData),
+        subscriptionManager.connect(SECOND).buySubscriptionWithDiscount(ETHER_ADDR, basePaymentPeriod, paymentToken),
       )
         .to.be.revertedWithCustomError(subscriptionManager, "NotAVault")
         .withArgs(SECOND.address);

@@ -499,7 +499,7 @@ describe("TokensPaymentModule", () => {
     it("should correctly buy subscription with native token with discount", async () => {
       const duration = basePaymentPeriod * 4n;
       const expectedCost = await tokensPaymentModule.getSubscriptionCostWithDiscount(
-        FIRST,
+        OWNER,
         ETHER_ADDR,
         duration,
         discountSBT,
@@ -510,17 +510,12 @@ describe("TokensPaymentModule", () => {
 
       expect(await ethers.provider.getBalance(tokensPaymentModule)).to.be.eq(0n);
 
-      await discountSBT.connect(OWNER).mint(FIRST, 2);
-
-      const discountData = {
-        sbtAddr: await discountSBT.getAddress(),
-        tokenId: 2,
-      };
+      await discountSBT.connect(OWNER).mint(OWNER, 2);
 
       await time.setNextBlockTimestamp(startTime);
       const tx = await tokensPaymentModule
-        .connect(FIRST)
-        .buySubscriptionWithDiscount(OWNER, ETHER_ADDR, duration, discountData, {
+        .connect(OWNER)
+        .buySubscriptionWithDiscount(ETHER_ADDR, duration, discountSBT, {
           value: expectedCost,
         });
 
@@ -531,10 +526,48 @@ describe("TokensPaymentModule", () => {
         .withArgs(OWNER.address, duration, expectedEndTime);
       await expect(tx)
         .to.emit(tokensPaymentModule, "SubscriptionBoughtWithToken")
-        .withArgs(ETHER_ADDR, FIRST.address, expectedCost);
+        .withArgs(ETHER_ADDR, OWNER.address, expectedCost);
     });
 
     it("should correctly buy subscription with ERC20 token with discount", async () => {
+      const duration = basePaymentPeriod * 2n;
+      const expectedCost = await tokensPaymentModule.getSubscriptionCostWithDiscount(
+        OWNER,
+        paymentToken,
+        duration,
+        discountSBT,
+      );
+
+      await paymentToken.connect(OWNER).approve(tokensPaymentModule, expectedCost);
+
+      const startTime = BigInt((await time.latest()) + 100);
+      const expectedEndTime = startTime + duration;
+
+      await discountSBT.connect(OWNER).mint(OWNER, 1);
+
+      await time.setNextBlockTimestamp(startTime);
+      const tx = await tokensPaymentModule
+        .connect(OWNER)
+        .buySubscriptionWithDiscount(paymentToken, duration, discountSBT);
+
+      await expect(tx)
+        .to.emit(tokensPaymentModule, "SubscriptionExtended")
+        .withArgs(OWNER.address, duration, expectedEndTime);
+      await expect(tx)
+        .to.emit(tokensPaymentModule, "SubscriptionBoughtWithToken")
+        .withArgs(await paymentToken.getAddress(), OWNER.address, expectedCost);
+
+      expect(await paymentToken.balanceOf(tokensPaymentModule)).to.be.eq(expectedCost);
+      expect(await paymentToken.balanceOf(OWNER)).to.be.eq(initialTokensAmount - expectedCost);
+    });
+
+    it("should correctly buy subscription with 100% discount", async () => {
+      const discountSBT = await ethers.deployContract("SBTMock");
+
+      await discountSBT.initialize("DiscountSBT", "DSBT", [OWNER]);
+
+      await tokensPaymentModule.updateDiscount(discountSBT, PERCENTAGE_100);
+
       const duration = basePaymentPeriod * 2n;
       const expectedCost = await tokensPaymentModule.getSubscriptionCostWithDiscount(
         FIRST,
@@ -543,77 +576,55 @@ describe("TokensPaymentModule", () => {
         discountSBT,
       );
 
-      await paymentToken.connect(FIRST).approve(tokensPaymentModule, expectedCost);
+      expect(expectedCost).to.be.eq(0);
 
       const startTime = BigInt((await time.latest()) + 100);
       const expectedEndTime = startTime + duration;
 
       await discountSBT.connect(OWNER).mint(FIRST, 1);
 
-      const discountData = {
-        sbtAddr: await discountSBT.getAddress(),
-        tokenId: 1,
-      };
-
       await time.setNextBlockTimestamp(startTime);
       const tx = await tokensPaymentModule
         .connect(FIRST)
-        .buySubscriptionWithDiscount(OWNER, paymentToken, duration, discountData);
+        .buySubscriptionWithDiscount(paymentToken, duration, discountSBT);
 
       await expect(tx)
         .to.emit(tokensPaymentModule, "SubscriptionExtended")
-        .withArgs(OWNER.address, duration, expectedEndTime);
+        .withArgs(FIRST.address, duration, expectedEndTime);
       await expect(tx)
         .to.emit(tokensPaymentModule, "SubscriptionBoughtWithToken")
         .withArgs(await paymentToken.getAddress(), FIRST.address, expectedCost);
 
       expect(await paymentToken.balanceOf(tokensPaymentModule)).to.be.eq(expectedCost);
-      expect(await paymentToken.balanceOf(FIRST)).to.be.eq(initialTokensAmount - expectedCost);
+      expect(await paymentToken.balanceOf(FIRST)).to.be.eq(initialTokensAmount);
     });
 
     it("should get exception if pass unsupported discount SBT", async () => {
-      const discountData = {
-        sbtAddr: await paymentToken.getAddress(),
-        tokenId: 1,
-      };
-
       await expect(
         tokensPaymentModule
-          .connect(FIRST)
-          .buySubscriptionWithDiscount(OWNER, paymentToken, basePaymentPeriod * 2n, discountData),
+          .connect(OWNER)
+          .buySubscriptionWithDiscount(paymentToken, basePaymentPeriod * 2n, paymentToken),
       )
         .to.be.revertedWithCustomError(tokensPaymentModule, "InvalidDiscountSBT")
         .withArgs(await paymentToken.getAddress());
     });
 
     it("should get exception if the caller is not the owner of the discount SBT", async () => {
-      await discountSBT.connect(OWNER).mint(OWNER, 1);
-
-      const discountData = {
-        sbtAddr: await discountSBT.getAddress(),
-        tokenId: 1,
-      };
-
       await expect(
         tokensPaymentModule
           .connect(FIRST)
-          .buySubscriptionWithDiscount(OWNER, paymentToken, basePaymentPeriod * 2n, discountData),
+          .buySubscriptionWithDiscount(paymentToken, basePaymentPeriod * 2n, discountSBT),
       )
         .to.be.revertedWithCustomError(tokensPaymentModule, "NotADiscountSBTOwner")
-        .withArgs(await discountSBT.getAddress(), FIRST.address, 1);
+        .withArgs(await discountSBT.getAddress(), FIRST.address);
     });
 
     it("should get exception if pass unsupported payment token", async () => {
       const unsupportedToken = await ethers.deployContract("ERC20Mock", ["Unsupported Token", "UT", 18]);
       const duration = basePaymentPeriod * 2n;
 
-      const discountData = {
-        sbtAddr: await discountSBT.getAddress(),
-        tokenId: 1,
-      };
-
       await expect(
-        tokensPaymentModule.connect(FIRST).buySubscriptionWithDiscount(OWNER, unsupportedToken, duration, discountData),
+        tokensPaymentModule.connect(FIRST).buySubscriptionWithDiscount(unsupportedToken, duration, discountSBT),
       )
         .to.be.revertedWithCustomError(tokensPaymentModule, "TokenNotSupported")
         .withArgs(await unsupportedToken.getAddress());

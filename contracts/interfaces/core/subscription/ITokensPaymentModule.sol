@@ -151,18 +151,16 @@ interface ITokensPaymentModule is IBaseSubscriptionModule {
     ) external payable;
 
     /**
-     * @notice A function to buy a subscription for an account using a supported payment token with discount.
-     * @param account_ The account to buy a subscription for.
+     * @notice A function to buy a subscription for the caller using a supported payment token with discount.
      * @param paymentToken_ The address of the ERC-20 token used for payment.
               Use `0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE` to pay in ETH.
      * @param duration_ Duration in seconds for which to extended the subscription.
-     * @param discount_ Discount data used to apply an SBT-based discount.
+     * @param discountSBT_ The SBT address used to apply a discount.
      */
     function buySubscriptionWithDiscount(
-        address account_,
         address paymentToken_,
         uint64 duration_,
-        ISBTDiscountModule.DiscountData memory discount_
+        address discountSBT_
     ) external payable;
 
     /**

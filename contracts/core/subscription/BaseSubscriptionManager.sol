@@ -210,10 +210,9 @@ abstract contract BaseSubscriptionManager is
 
     /// @inheritdoc ITokensPaymentModule
     function buySubscriptionWithDiscount(
-        address account_,
         address token_,
         uint64 duration_,
-        DiscountData memory discount_
+        address discountSBT_
     )
         public
         payable
@@ -222,7 +221,7 @@ abstract contract BaseSubscriptionManager is
         nonReentrant
         whenNotPaused
     {
-        super.buySubscriptionWithDiscount(account_, token_, duration_, discount_);
+        super.buySubscriptionWithDiscount(token_, duration_, discountSBT_);
     }
 
     /// @inheritdoc ISBTPaymentModule

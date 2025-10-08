@@ -5,8 +5,8 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 
 import {PERCENTAGE_100} from "@solarity/solidity-lib/utils/Globals.sol";
+import {ISBT} from "@solarity/solidity-lib/interfaces/tokens/ISBT.sol";
 
-import {IBurnableSBT} from "../../../interfaces/tokens/IBurnableSBT.sol";
 import {ISBTDiscountModule} from "../../../interfaces/core/subscription/ISBTDiscountModule.sol";
 
 abstract contract SBTDiscountModule is ISBTDiscountModule {
@@ -53,16 +53,13 @@ abstract contract SBTDiscountModule is ISBTDiscountModule {
         emit DiscountUpdated(sbt_, discount_);
     }
 
-    function _validateDiscount(DiscountData memory discount_) internal view {
+    function _validateDiscount(address sbt_, address account_) internal view {
         require(
-            _getSBTDiscountModuleStorage().sbtDiscounts.contains(discount_.sbtAddr),
-            InvalidDiscountSBT(discount_.sbtAddr)
+            _getSBTDiscountModuleStorage().sbtDiscounts.contains(sbt_),
+            InvalidDiscountSBT(sbt_)
         );
 
-        require(
-            IBurnableSBT(discount_.sbtAddr).ownerOf(discount_.tokenId) == msg.sender,
-            NotADiscountSBTOwner(discount_.sbtAddr, msg.sender, discount_.tokenId)
-        );
+        require(ISBT(sbt_).balanceOf(account_) != 0, NotADiscountSBTOwner(sbt_, account_));
     }
 
     function _applyDiscount(uint256 amount_, uint256 discount_) internal pure returns (uint256) {

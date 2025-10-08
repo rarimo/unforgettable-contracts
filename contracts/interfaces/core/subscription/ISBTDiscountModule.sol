@@ -9,16 +9,6 @@ import {IBaseSubscriptionModule} from "./IBaseSubscriptionModule.sol";
  */
 interface ISBTDiscountModule is IBaseSubscriptionModule {
     /**
-     * @notice Data structure storing data used for retrieving and validating SBT-based discounts.
-     * @param sbtAddr The address of the SBT contract providing the discount.
-     * @param tokenId The ID of the SBT used to verify ownership.
-     */
-    struct DiscountData {
-        address sbtAddr;
-        uint256 tokenId;
-    }
-
-    /**
      * @notice Data structure storing data used to update the SBT discounts configuration.
      * @param sbtAddr The address of the SBT contract associated with the discount.
      * @param discount The discount percentage value applied to subscription costs.
@@ -34,12 +24,11 @@ interface ISBTDiscountModule is IBaseSubscriptionModule {
      */
     error InvalidDiscountSBT(address sbt);
     /**
-     * @notice Thrown when the caller is not the owner of the provided discount SBT.
+     * @notice Thrown when the caller doesn't own the provided discount SBT.
      * @param sbt The SBT contract address.
      * @param account The address attempting to claim the discount.
-     * @param tokenId The token ID used for the ownership verification.
      */
-    error NotADiscountSBTOwner(address sbt, address account, uint256 tokenId);
+    error NotADiscountSBTOwner(address sbt, address account);
     /**
      * @notice Thrown when a provided discount value is invalid (exceeds 100%).
      * @param discount The invalid discount value.

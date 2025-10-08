@@ -801,30 +801,27 @@ describe("AccountSubscriptionManager", () => {
         },
       ]);
 
-      await discountSBT.connect(OWNER).mint(OWNER, 1);
-
-      const discountData = {
-        sbtAddr: await discountSBT.getAddress(),
-        tokenId: 1,
-      };
+      await discountSBT.connect(OWNER).mint(FIRST, 1);
 
       const duration = basePaymentPeriod * 10n;
       const expectedCost = (paymentTokenSubscriptionCost * 10n * (PERCENTAGE_100 - discount)) / PERCENTAGE_100;
 
-      await paymentToken.mint(OWNER, expectedCost);
-      await paymentToken.approve(subscriptionManager, expectedCost);
+      await paymentToken.mint(FIRST, expectedCost);
+      await paymentToken.connect(FIRST).approve(subscriptionManager, expectedCost);
 
       const startTime = (await time.latest()) + 100;
 
       await time.setNextBlockTimestamp(startTime);
-      const tx = await subscriptionManager.buySubscriptionWithDiscount(FIRST, paymentToken, duration, discountData);
+      const tx = await subscriptionManager
+        .connect(FIRST)
+        .buySubscriptionWithDiscount(paymentToken, duration, discountSBT);
 
       await expect(tx)
         .to.emit(subscriptionManager, "SubscriptionBoughtWithToken")
-        .withArgs(await paymentToken.getAddress(), OWNER, expectedCost);
+        .withArgs(await paymentToken.getAddress(), FIRST, expectedCost);
       await expect(tx).to.changeTokenBalances(
         paymentToken,
-        [OWNER, subscriptionManager],
+        [FIRST, subscriptionManager],
         [-expectedCost, expectedCost],
       );
     });
@@ -832,15 +829,8 @@ describe("AccountSubscriptionManager", () => {
     it("should get exception if paused", async () => {
       await subscriptionManager.pause();
 
-      const discountData = {
-        sbtAddr: await paymentToken.getAddress(),
-        tokenId: 1,
-      };
-
       await expect(
-        subscriptionManager
-          .connect(FIRST)
-          .buySubscriptionWithDiscount(FIRST, ETHER_ADDR, basePaymentPeriod, discountData),
+        subscriptionManager.connect(FIRST).buySubscriptionWithDiscount(ETHER_ADDR, basePaymentPeriod, paymentToken),
       )
         .to.be.revertedWithCustomError(subscriptionManager, "EnforcedPause")
         .withArgs();

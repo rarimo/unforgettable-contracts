@@ -10,6 +10,7 @@ export const deployConfig: DeployConfig = {
   vaultSubscriptionManagerConfig: {
     paymentTokenModuleConfig: {
       basePaymentPeriod: 3600n * 24n * 30n,
+      discountEntries: [],
       durationFactorEntries: [
         {
           duration: 3600n * 24n * 30n * 12n,
@@ -36,6 +37,7 @@ export const deployConfig: DeployConfig = {
   accountSubscriptionManagerConfig: {
     paymentTokenModuleConfig: {
       basePaymentPeriod: 3600n * 24n * 30n,
+      discountEntries: [],
       durationFactorEntries: [
         {
           duration: 3600n * 24n * 30n * 12n,

@@ -15,10 +15,17 @@ export type DeployConfig = {
   accountSubscriptionManagerConfig: AccountSubscriptionManagerConfig;
   sideChainSubscriptionManagerConfig: SideChainSubscriptionManagerConfig;
   crosschainConfig: CrosschainConfig;
+  signatureSBTConfig?: SignatureSBTConfig;
 };
 
 export type ReservedRMOConfig = {
   reservedTokensAmountPerAddress: bigint;
+};
+
+export type SignatureSBTConfig = {
+  name: string;
+  symbol: string;
+  signers: string[];
 };
 
 export type VaultSubscriptionManagerConfig = {

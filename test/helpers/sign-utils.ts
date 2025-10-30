@@ -1,12 +1,13 @@
 import {
   BuySubscriptionTypes,
+  MintSignatureSBTTypes,
   RecoverAccountTypes,
   SafeTransactionTypes,
   VaultUpdateEnabledStatusTypes,
   VaultUpdateMasterKeyTypes,
   VaultWithdrawTokensTypes,
 } from "@/test/helpers/eip712types";
-import { EIP712Upgradeable, SafeMock, SignatureRecoveryStrategy, Vault } from "@ethers-v6";
+import { EIP712Upgradeable, SafeMock, SignatureRecoveryStrategy, SignatureSBT, Vault } from "@ethers-v6";
 
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 
@@ -53,6 +54,12 @@ export interface SafeTransactionData {
   gasToken: string;
   refundReceiver: string;
   nonce: bigint;
+}
+
+export interface MintSignatureSBTData {
+  recipient: string;
+  tokenId: bigint;
+  tokenURI: string;
 }
 
 export async function getDomain(contract: EIP712Upgradeable): Promise<TypedDataDomain> {
@@ -161,4 +168,18 @@ export async function getSafeTransactionSignature(
   };
 
   return await account.signTypedData(domain, SafeTransactionTypes, data);
+}
+
+export async function getMintSigSBTSignature(
+  sigSBT: SignatureSBT,
+  account: SignerWithAddress,
+  data: MintSignatureSBTData,
+): Promise<string> {
+  const domain = await getDomain(sigSBT as unknown as EIP712Upgradeable);
+
+  return await account.signTypedData(domain, MintSignatureSBTTypes, {
+    recipient: data.recipient,
+    tokenId: data.tokenId,
+    tokenURIHash: ethers.keccak256(data.tokenURI),
+  });
 }

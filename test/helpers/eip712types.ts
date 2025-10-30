@@ -53,3 +53,11 @@ export const SafeTransactionTypes: Record<string, TypedDataField[]> = {
     { name: "nonce", type: "uint256" },
   ],
 };
+
+export const MintSignatureSBTTypes: Record<string, TypedDataField[]> = {
+  MintSBT: [
+    { name: "recipient", type: "address" },
+    { name: "tokenId", type: "uint256" },
+    { name: "tokenURIHash", type: "bytes32" },
+  ],
+};

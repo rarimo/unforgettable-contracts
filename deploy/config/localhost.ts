@@ -1,6 +1,6 @@
 import { ETHER_ADDR, PRECISION, wei } from "@/scripts";
 
-import { DeployConfig } from "./types";
+import { DeployConfig, HelperDataDeployConfig } from "./types";
 
 export const deployConfig: DeployConfig = {
   contractsOwner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
@@ -10,6 +10,7 @@ export const deployConfig: DeployConfig = {
   vaultSubscriptionManagerConfig: {
     paymentTokenModuleConfig: {
       basePaymentPeriod: 3600n * 24n * 30n,
+      discountEntries: [],
       durationFactorEntries: [
         {
           duration: 3600n * 24n * 30n * 12n,
@@ -36,6 +37,7 @@ export const deployConfig: DeployConfig = {
   accountSubscriptionManagerConfig: {
     paymentTokenModuleConfig: {
       basePaymentPeriod: 3600n * 24n * 30n,
+      discountEntries: [],
       durationFactorEntries: [
         {
           duration: 3600n * 24n * 30n * 12n,
@@ -78,5 +80,11 @@ export const deployConfig: DeployConfig = {
       subscriptionsSynchronizer: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
       sourceChainId: "2",
     },
+  },
+};
+
+export const helperDataDeployConfig: HelperDataDeployConfig = {
+  helperDataFactoryConfig: {
+    helperDataManagers: [],
   },
 };

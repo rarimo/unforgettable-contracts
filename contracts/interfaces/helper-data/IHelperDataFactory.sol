@@ -10,6 +10,12 @@ interface IHelperDataFactory {
         EXPIRED
     }
 
+    struct AccountInfo {
+        address account;
+        uint64 subscriptionEndTime;
+        bytes32 metadata;
+    }
+
     struct AccountData {
         uint64 subscriptionEndTime;
         bytes32 metadata;

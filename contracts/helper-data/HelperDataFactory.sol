@@ -148,6 +148,17 @@ contract HelperDataFactory is
         return getHelperDataPointersPaginated(account_, 0, type(uint256).max);
     }
 
+    function getAccountInfo(address account_) external view returns (AccountInfo memory) {
+        AccountData storage accountData = _getHelperDataFactoryStorage().accountsData[account_];
+
+        return
+            AccountInfo({
+                account: account_,
+                subscriptionEndTime: accountData.subscriptionEndTime,
+                metadata: accountData.metadata
+            });
+    }
+
     function readPointersData(
         address[] calldata pointers_
     ) external view returns (bytes[] memory pointersData_) {
@@ -156,6 +167,10 @@ contract HelperDataFactory is
         for (uint256 i = 0; i < pointers_.length; ++i) {
             pointersData_[i] = SSTORE2.read(pointers_[i]);
         }
+    }
+
+    function implementation() external view returns (address) {
+        return ERC1967Utils.getImplementation();
     }
 
     function getRegisteredAccountsWithFiltersPaginated(
@@ -287,8 +302,7 @@ contract HelperDataFactory is
         uint256 partIndex_,
         bytes memory data_
     ) internal onlyRegisteredAccount(account_) returns (address partPointer_) {
-        HelperDataFactoryStorage storage $ = _getHelperDataFactoryStorage();
-        AccountData storage accountData = $.accountsData[account_];
+        AccountData storage accountData = _getHelperDataFactoryStorage().accountsData[account_];
 
         require(
             !accountData.helperDataParts.contains(partIndex_),
@@ -299,7 +313,6 @@ contract HelperDataFactory is
 
         partPointer_ = SSTORE2.write(submitData_);
 
-        $.registeredAccounts.add(account_);
         accountData.helperDataParts.set(partIndex_, partPointer_);
 
         emit HelperDataPartSubmitted(account_, partIndex_, partPointer_);

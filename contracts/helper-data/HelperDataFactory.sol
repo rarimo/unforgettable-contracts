@@ -68,14 +68,17 @@ contract HelperDataFactory is
         _addHelperDataManagers(initialManagers_);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function addHelperDataManagers(address[] calldata managersToAdd_) external onlyOwner {
         _addHelperDataManagers(managersToAdd_);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function removeHelperDataManagers(address[] calldata managersToRemove_) external onlyOwner {
         _removeHelperDataManagers(managersToRemove_);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function registerAccount(
         address account_,
         uint256 partIndex_,
@@ -88,6 +91,7 @@ contract HelperDataFactory is
         return _submitHelperDataPart(account_, partIndex_, data_);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function updateAccountMetadata(
         address account_,
         bytes32 newMetadata_
@@ -95,6 +99,7 @@ contract HelperDataFactory is
         _updateAccountMetadata(account_, newMetadata_);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function updateAccountSubscriptionEndTime(
         address account_,
         uint64 newEndTime_
@@ -102,6 +107,7 @@ contract HelperDataFactory is
         _updateAccountSubscriptionEndTime(account_, newEndTime_);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function increaseAccountSubscriptionEndTime(
         address account_,
         uint64 amountToIncrease_
@@ -113,6 +119,7 @@ contract HelperDataFactory is
         _updateAccountSubscriptionEndTime(account_, newEndTime_);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function submitHelperDataPart(
         address account_,
         uint256 partIndex_,
@@ -121,18 +128,22 @@ contract HelperDataFactory is
         return _submitHelperDataPart(account_, partIndex_, data_);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function getHelperDataManagers() external view returns (address[] memory) {
         return _getHelperDataFactoryStorage().helperDataManagers.values();
     }
 
+    /// @inheritdoc IHelperDataFactory
     function getRegisteredAccountsCount() external view returns (uint256) {
         return _getHelperDataFactoryStorage().registeredAccounts.length();
     }
 
+    /// @inheritdoc IHelperDataFactory
     function getRegisteredAccounts() external view returns (address[] memory) {
         return getRegisteredAccountsPaginated(0, type(uint256).max);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function getRegisteredAccountsWithFilters(
         AccountStatus status_,
         bytes32 metadata_
@@ -140,14 +151,17 @@ contract HelperDataFactory is
         return getRegisteredAccountsWithFiltersPaginated(status_, metadata_, 0, type(uint256).max);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function getHelperDataPartsCount(address account_) external view returns (uint256) {
         return _getHelperDataFactoryStorage().accountsData[account_].helperDataParts.length();
     }
 
+    /// @inheritdoc IHelperDataFactory
     function getHelperDataPointers(address account_) external view returns (address[] memory) {
         return getHelperDataPointersPaginated(account_, 0, type(uint256).max);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function getAccountInfo(address account_) external view returns (AccountInfo memory) {
         AccountData storage accountData = _getHelperDataFactoryStorage().accountsData[account_];
 
@@ -159,6 +173,7 @@ contract HelperDataFactory is
             });
     }
 
+    /// @inheritdoc IHelperDataFactory
     function readPointersData(
         address[] calldata pointers_
     ) external view returns (bytes[] memory pointersData_) {
@@ -169,10 +184,12 @@ contract HelperDataFactory is
         }
     }
 
+    /// @inheritdoc IHelperDataFactory
     function implementation() external view returns (address) {
         return ERC1967Utils.getImplementation();
     }
 
+    /// @inheritdoc IHelperDataFactory
     function getRegisteredAccountsWithFiltersPaginated(
         AccountStatus status_,
         bytes32 metadata_,
@@ -198,6 +215,7 @@ contract HelperDataFactory is
         return filteredAccounts_.toArray();
     }
 
+    /// @inheritdoc IHelperDataFactory
     function getRegisteredAccountsPaginated(
         uint256 offset_,
         uint256 limit_
@@ -205,6 +223,7 @@ contract HelperDataFactory is
         return _getHelperDataFactoryStorage().registeredAccounts.part(offset_, limit_);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function getHelperDataPointersPaginated(
         address account_,
         uint256 offset_,
@@ -222,14 +241,17 @@ contract HelperDataFactory is
         }
     }
 
+    /// @inheritdoc IHelperDataFactory
     function isHelperDataManager(address manager_) public view returns (bool) {
         return _getHelperDataFactoryStorage().helperDataManagers.contains(manager_);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function isAccountRegistered(address account_) public view returns (bool) {
         return _getHelperDataFactoryStorage().registeredAccounts.contains(account_);
     }
 
+    /// @inheritdoc IHelperDataFactory
     function getAccountStatus(address account_) public view returns (AccountStatus) {
         AccountData storage accountData = _getHelperDataFactoryStorage().accountsData[account_];
 

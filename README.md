@@ -30,12 +30,14 @@ contracts
 │   │   │   └── TokensPaymentModule — "Subscription payments in ETH or ERC-20 tokens"
 │   │   ├── BaseSideChainSubscriptionManager — "Base subscription manager for side chains"
 │   │   └── BaseSubscriptionManager — "Subscription manager coordinating multiple payment modules"
-│   ├── HelperDataRegistry — "Helper data storage updated via EIP-712 signatures"
 │   └── RecoveryManager — "Central recovery coordinator with pluggable strategies"
 ├── crosschain
 │   ├── SideChainSubscriptionManager — "Subscription manager for side chains with crosschain sync support"
 │   ├── SubscriptionsStateReceiver — "Receives and processes crosschain subscription state updates"
 │   └── SubscriptionsSynchronizer — "Synchronizes subscription states across chains via Wormhole"
+├── helper-data
+│   ├── HelperDataFactory — "Factory managing account registration, helper data parts submission, and metadata/subscription tracking"
+|   └── HelperDataRegistry — "Helper data storage updated via EIP-712 signatures"
 ├── libs
 │   ├── EIP712SignatureChecker — "A wrapper around OZ SignatureChecker for EIP-712 signature validations"
 │   └── TokensHelper — "ETH/ERC-20 transfer utilities"

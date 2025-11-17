@@ -1,6 +1,8 @@
 import { ETHER_ADDR, PRECISION, wei } from "@/scripts";
 
-import { DeployConfig } from "./types";
+import { ethers } from "hardhat";
+
+import { DeployConfig, HelperDataDeployConfig } from "./types";
 
 export const deployConfig: DeployConfig = {
   contractsOwner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
@@ -79,6 +81,39 @@ export const deployConfig: DeployConfig = {
       wormholeRelayer: "0x4a8bc80Ed5a4067f1CCf107057b8270E0cC11A78",
       subscriptionsSynchronizer: "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
       sourceChainId: "2",
+    },
+  },
+};
+
+export const helperDataDeployConfig: HelperDataDeployConfig = {
+  helperDataFactoryConfig: {
+    helperDataManagers: [],
+  },
+  helperDataSubscriptionManagerConfig: {
+    paymentTokenModuleConfig: {
+      basePaymentPeriod: 3600n * 24n * 30n,
+      discountEntries: [],
+      durationFactorEntries: [
+        {
+          duration: 3600n * 24n * 30n * 12n,
+          factor: PRECISION * 95n,
+        },
+      ],
+      paymentTokenEntries: [
+        {
+          paymentToken: ETHER_ADDR,
+          baseSubscriptionCost: wei(1, 16),
+        },
+      ],
+    },
+    sbtPaymentModuleConfig: {
+      sbtEntries: [],
+    },
+    signatureSubscriptionModuleConfig: {
+      subscriptionSigner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    },
+    crossChainModuleConfig: {
+      subscriptionsSynchronizer: ethers.ZeroAddress,
     },
   },
 };

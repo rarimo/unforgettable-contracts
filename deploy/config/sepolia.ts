@@ -10,6 +10,7 @@ export const deployConfig: DeployConfig = {
   vaultSubscriptionManagerConfig: {
     paymentTokenModuleConfig: {
       basePaymentPeriod: 600n,
+      discountEntries: [],
       durationFactorEntries: [
         {
           duration: 600n * 6n,
@@ -49,6 +50,7 @@ export const deployConfig: DeployConfig = {
   accountSubscriptionManagerConfig: {
     paymentTokenModuleConfig: {
       basePaymentPeriod: 600n,
+      discountEntries: [],
       durationFactorEntries: [
         {
           duration: 600n * 6n,
@@ -104,5 +106,10 @@ export const deployConfig: DeployConfig = {
       subscriptionsSynchronizer: "0x0000000000000000000000000000000000000000",
       sourceChainId: 2,
     },
+  },
+  signatureSBTConfig: {
+    name: "Test Shadow SBT",
+    symbol: "shSBT",
+    signers: [],
   },
 };

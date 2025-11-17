@@ -13,6 +13,7 @@ export const deployConfig: DeployConfig = {
   vaultSubscriptionManagerConfig: {
     paymentTokenModuleConfig: {
       basePaymentPeriod: basePaymentPeriod, // 1 month
+      discountEntries: [],
       durationFactorEntries: [
         {
           duration: oneYear, // 1 year
@@ -64,6 +65,7 @@ export const deployConfig: DeployConfig = {
   accountSubscriptionManagerConfig: {
     paymentTokenModuleConfig: {
       basePaymentPeriod: basePaymentPeriod, // 1 month
+      discountEntries: [],
       durationFactorEntries: [
         {
           duration: oneYear, // 1 year

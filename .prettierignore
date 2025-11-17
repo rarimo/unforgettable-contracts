@@ -2,6 +2,7 @@ node_modules
 .env
 .DS_Store
 package-lock.json
+lib
 
 # Hardhat files
 cache

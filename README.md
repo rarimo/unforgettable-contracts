@@ -42,6 +42,7 @@ contracts
 ├── safe
 │   └── UnforgettableRecoveryModule — "Gnosis Safe module enabling access recovery by swapping a specified owner"
 ├── tokens
+|   ├── SignatureSBT — "SBT Token with signature minting logic"
 │   └── ReservedRMO — "ERC-20 token granting each vault a one-time reserved token allocation"
 └── vaults
     ├── Vault — "A vault controlled with a master key EIP-712 signature"

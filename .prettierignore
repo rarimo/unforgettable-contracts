@@ -4,6 +4,8 @@ node_modules
 package-lock.json
 lib
 
+lib
+
 # Hardhat files
 cache
 artifacts

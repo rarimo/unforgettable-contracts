@@ -1,6 +1,6 @@
 import { ETHER_ADDR, wei } from "@scripts";
 
-import { DeployConfig } from "./types";
+import { DeployConfig, HelperDataDeployConfig } from "./types";
 
 const basePaymentPeriod = 2_629_800n; // 1 month
 const oneYear = basePaymentPeriod * 12n; // 1 year
@@ -133,5 +133,11 @@ export const deployConfig: DeployConfig = {
       subscriptionsSynchronizer: "0x0000000000000000000000000000000000000000",
       sourceChainId: 1,
     },
+  },
+};
+
+export const helperDataDeployConfig: HelperDataDeployConfig = {
+  helperDataFactoryConfig: {
+    helperDataManagers: [],
   },
 };

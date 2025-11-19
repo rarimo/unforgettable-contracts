@@ -8,11 +8,14 @@ export = async (deployer: Deployer) => {
   const config = await getConfig();
 
   if (config.signatureSBTConfig) {
-    const signatureSBT = await deployer.deployERC1967Proxy(SignatureSBT__factory, "0x", {
+    const initData = SignatureSBT__factory.createInterface().encodeFunctionData("initialize(string,string)", [
+      config.signatureSBTConfig.name,
+      config.signatureSBTConfig.symbol,
+    ]);
+
+    const signatureSBT = await deployer.deployERC1967Proxy(SignatureSBT__factory, initData, {
       name: "SignatureSBT",
     });
-
-    await signatureSBT.initialize(config.signatureSBTConfig.name, config.signatureSBTConfig.symbol);
 
     if (config.signatureSBTConfig.signers.length > 0) {
       await signatureSBT.addSigners(config.signatureSBTConfig.signers);

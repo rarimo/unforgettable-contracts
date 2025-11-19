@@ -6,7 +6,7 @@ import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { expect } from "chai";
 import { ethers } from "hardhat";
 
-describe.only("SignatureSBT", () => {
+describe("SignatureSBT", () => {
   const reverter = new Reverter();
 
   const name: string = "Test SBT";

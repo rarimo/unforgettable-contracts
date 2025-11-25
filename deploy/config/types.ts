@@ -20,6 +20,7 @@ export type DeployConfig = {
 
 export type HelperDataDeployConfig = {
   helperDataFactoryConfig: HelperDataFactoryConfig;
+  helperDataSubscriptionManagerConfig: HelperDataSubscriptionManagerConfig;
 };
 
 export type ReservedRMOConfig = {
@@ -57,4 +58,11 @@ export type CrosschainConfig = {
 
 export type HelperDataFactoryConfig = {
   helperDataManagers: string[];
+};
+
+export type HelperDataSubscriptionManagerConfig = {
+  paymentTokenModuleConfig: ITokensPaymentModule.TokensPaymentModuleInitDataStruct;
+  sbtPaymentModuleConfig: ISBTPaymentModule.SBTPaymentModuleInitDataStruct;
+  signatureSubscriptionModuleConfig: ISignatureSubscriptionModule.SigSubscriptionModuleInitDataStruct;
+  crossChainModuleConfig: ICrossChainModule.CrossChainModuleInitDataStruct;
 };

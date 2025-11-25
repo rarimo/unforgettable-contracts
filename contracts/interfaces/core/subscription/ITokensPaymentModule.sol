@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {IBaseSubscriptionModule} from "./IBaseSubscriptionModule.sol";
 import {ISBTDiscountModule} from "./ISBTDiscountModule.sol";
 
 /**
  * @title ITokensPaymentModule
  * @notice Interface for the TokensPaymentModule contract
  */
-interface ITokensPaymentModule is IBaseSubscriptionModule {
+interface ITokensPaymentModule is ISBTDiscountModule {
     /**
      * @notice Data structure storing data used to update the payment token configuration.
      * @param paymentToken The payment token contract address.
@@ -41,7 +40,7 @@ interface ITokensPaymentModule is IBaseSubscriptionModule {
         uint64 basePaymentPeriod;
         PaymentTokenUpdateEntry[] paymentTokenEntries;
         DurationFactorUpdateEntry[] durationFactorEntries;
-        ISBTDiscountModule.SBTDiscountUpdateEntry[] discountEntries;
+        SBTDiscountUpdateEntry[] discountEntries;
     }
 
     /**

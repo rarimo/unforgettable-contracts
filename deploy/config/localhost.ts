@@ -1,5 +1,7 @@
 import { ETHER_ADDR, PRECISION, wei } from "@/scripts";
 
+import { ethers } from "hardhat";
+
 import { DeployConfig, HelperDataDeployConfig } from "./types";
 
 export const deployConfig: DeployConfig = {
@@ -86,5 +88,32 @@ export const deployConfig: DeployConfig = {
 export const helperDataDeployConfig: HelperDataDeployConfig = {
   helperDataFactoryConfig: {
     helperDataManagers: [],
+  },
+  helperDataSubscriptionManagerConfig: {
+    paymentTokenModuleConfig: {
+      basePaymentPeriod: 3600n * 24n * 30n,
+      discountEntries: [],
+      durationFactorEntries: [
+        {
+          duration: 3600n * 24n * 30n * 12n,
+          factor: PRECISION * 95n,
+        },
+      ],
+      paymentTokenEntries: [
+        {
+          paymentToken: ETHER_ADDR,
+          baseSubscriptionCost: wei(1, 16),
+        },
+      ],
+    },
+    sbtPaymentModuleConfig: {
+      sbtEntries: [],
+    },
+    signatureSubscriptionModuleConfig: {
+      subscriptionSigner: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    },
+    crossChainModuleConfig: {
+      subscriptionsSynchronizer: ethers.ZeroAddress,
+    },
   },
 };

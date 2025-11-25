@@ -139,19 +139,6 @@ contract HelperDataFactory is
     }
 
     /// @inheritdoc IHelperDataFactory
-    function getRegisteredAccounts() external view returns (address[] memory) {
-        return getRegisteredAccountsPaginated(0, type(uint256).max);
-    }
-
-    /// @inheritdoc IHelperDataFactory
-    function getRegisteredAccountsWithFilters(
-        AccountStatus status_,
-        bytes32 metadata_
-    ) external view returns (address[] memory) {
-        return getRegisteredAccountsWithFiltersPaginated(status_, metadata_, 0, type(uint256).max);
-    }
-
-    /// @inheritdoc IHelperDataFactory
     function getHelperDataPartsCount(address account_) external view returns (uint256) {
         return _getHelperDataFactoryStorage().accountsData[account_].helperDataParts.length();
     }

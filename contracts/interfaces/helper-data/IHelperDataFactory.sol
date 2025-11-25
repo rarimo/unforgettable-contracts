@@ -200,23 +200,6 @@ interface IHelperDataFactory {
     function getRegisteredAccountsCount() external view returns (uint256);
 
     /**
-     * @notice Returns all registered account addresses.
-     * @return An array of all registered account addresses.
-     */
-    function getRegisteredAccounts() external view returns (address[] memory);
-
-    /**
-     * @notice Returns registered accounts filtered by subscription status and metadata.
-     * @param status_ Filter by `AccountStatus` (NONE, ACTIVE, or EXPIRED).
-     * @param metadata_ Filter by metadata value (pass 0 to match any metadata).
-     * @return An array of matching account addresses.
-     */
-    function getRegisteredAccountsWithFilters(
-        AccountStatus status_,
-        bytes32 metadata_
-    ) external view returns (address[] memory);
-
-    /**
      * @notice Returns the count of helper data parts for an account.
      * @param account_ Address of the account.
      * @return The number of helper data parts registered for this account.

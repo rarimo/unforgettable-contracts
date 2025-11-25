@@ -109,6 +109,11 @@ export const deployConfig: DeployConfig = {
       sourceChainId: 2,
     },
   },
+  signatureSBTConfig: {
+    name: "Test Shadow SBT",
+    symbol: "shSBT",
+    signers: [],
+  },
 };
 
 export const helperDataDeployConfig: HelperDataDeployConfig = {

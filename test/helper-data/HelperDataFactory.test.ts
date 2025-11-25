@@ -149,7 +149,7 @@ describe("HelperDataFactory", () => {
       expect(await factory.getAccountStatus(USER1)).to.be.eq(AccountStatus.ACTIVE);
 
       expect(await factory.getRegisteredAccountsCount()).to.be.eq(1n);
-      expect(await factory.getRegisteredAccounts()).to.be.deep.eq([USER1.address]);
+      expect(await factory.getRegisteredAccountsPaginated(0n, 10n)).to.be.deep.eq([USER1.address]);
       expect(await factory.getHelperDataPartsCount(USER1)).to.be.eq(1n);
 
       const pointers = await factory.getHelperDataPointers(USER1);
@@ -321,7 +321,7 @@ describe("HelperDataFactory", () => {
       await expect(tx).to.emit(factory, "HelperDataPartSubmitted").withArgs(USER1.address, index, pointerAddress1);
 
       expect(await factory.getRegisteredAccountsCount()).to.be.eq(1n);
-      expect(await factory.getRegisteredAccounts()).to.deep.eq([USER1.address]);
+      expect(await factory.getRegisteredAccountsPaginated(0n, 10n)).to.deep.eq([USER1.address]);
       expect(await factory.getHelperDataPartsCount(USER1)).to.be.eq(2n);
       expect((await factory.getHelperDataPointers(USER1))[1]).to.be.eq(pointerAddress1);
 
@@ -369,7 +369,7 @@ describe("HelperDataFactory", () => {
     });
   });
 
-  describe("#getRegisteredAccountsWithFilters", () => {
+  describe("#getRegisteredAccountsWithFiltersPaginated", () => {
     let accounts: SignerWithAddress[];
     let endTimeArr: bigint[];
 
@@ -386,22 +386,27 @@ describe("HelperDataFactory", () => {
     });
 
     it("should correctly filter registered accounts by status", async () => {
-      let result = await factory.getRegisteredAccountsWithFilters(AccountStatus.ACTIVE, ethers.ZeroHash);
+      let result = await factory.getRegisteredAccountsWithFiltersPaginated(
+        AccountStatus.ACTIVE,
+        ethers.ZeroHash,
+        0n,
+        10n,
+      );
       let expectedAccounts = accounts.map((acc) => acc.address);
 
       expect(result).to.be.deep.eq(expectedAccounts);
 
-      result = await factory.getRegisteredAccountsWithFilters(AccountStatus.NONE, ethers.ZeroHash);
+      result = await factory.getRegisteredAccountsWithFiltersPaginated(AccountStatus.NONE, ethers.ZeroHash, 0n, 10n);
 
       expect(result).to.be.deep.eq([]);
 
       await time.increaseTo(endTimeArr[0] + 10n);
 
-      result = await factory.getRegisteredAccountsWithFilters(AccountStatus.ACTIVE, ethers.ZeroHash);
+      result = await factory.getRegisteredAccountsWithFiltersPaginated(AccountStatus.ACTIVE, ethers.ZeroHash, 0n, 10n);
 
       expect(result).to.be.deep.eq(expectedAccounts.slice(1));
 
-      result = await factory.getRegisteredAccountsWithFilters(AccountStatus.EXPIRED, ethers.ZeroHash);
+      result = await factory.getRegisteredAccountsWithFiltersPaginated(AccountStatus.EXPIRED, ethers.ZeroHash, 0n, 10n);
 
       expect(result).to.be.deep.eq([expectedAccounts[0]]);
 
@@ -409,7 +414,7 @@ describe("HelperDataFactory", () => {
         .connect(MANAGER)
         .registerAccount(MANAGER, 0n, 0n, ethers.ZeroHash, ethers.encodeBytes32String("data"));
 
-      result = await factory.getRegisteredAccountsWithFilters(AccountStatus.NONE, ethers.ZeroHash);
+      result = await factory.getRegisteredAccountsWithFiltersPaginated(AccountStatus.NONE, ethers.ZeroHash, 0n, 10n);
 
       expect(result).to.be.deep.eq([MANAGER.address]);
     });
@@ -421,17 +426,17 @@ describe("HelperDataFactory", () => {
       await factory.connect(MANAGER).updateAccountMetadata(USER1, testMetadata);
       await factory.connect(MANAGER).updateAccountMetadata(USER2, testMetadata);
 
-      let result = await factory.getRegisteredAccountsWithFilters(AccountStatus.ACTIVE, testMetadata);
+      let result = await factory.getRegisteredAccountsWithFiltersPaginated(AccountStatus.ACTIVE, testMetadata, 0n, 10n);
 
       expect(result).to.be.deep.eq(expectedAccounts);
 
       await time.increaseTo(endTimeArr[1] + 10n);
 
-      result = await factory.getRegisteredAccountsWithFilters(AccountStatus.ACTIVE, testMetadata);
+      result = await factory.getRegisteredAccountsWithFiltersPaginated(AccountStatus.ACTIVE, testMetadata, 0n, 10n);
 
       expect(result).to.be.deep.eq(expectedAccounts.slice(1));
 
-      result = await factory.getRegisteredAccountsWithFilters(AccountStatus.EXPIRED, testMetadata);
+      result = await factory.getRegisteredAccountsWithFiltersPaginated(AccountStatus.EXPIRED, testMetadata, 0n, 10n);
 
       expect(result).to.be.deep.eq([expectedAccounts[0]]);
     });

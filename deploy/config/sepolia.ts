@@ -1,6 +1,6 @@
 import { ETHER_ADDR, PRECISION, wei } from "@scripts";
 
-import { DeployConfig } from "./types";
+import { DeployConfig, HelperDataDeployConfig } from "./types";
 
 export const deployConfig: DeployConfig = {
   contractsOwner: "",
@@ -111,5 +111,11 @@ export const deployConfig: DeployConfig = {
     name: "Test Shadow SBT",
     symbol: "shSBT",
     signers: [],
+  },
+};
+
+export const helperDataDeployConfig: HelperDataDeployConfig = {
+  helperDataFactoryConfig: {
+    helperDataManagers: [],
   },
 };

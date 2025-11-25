@@ -18,6 +18,10 @@ export type DeployConfig = {
   signatureSBTConfig?: SignatureSBTConfig;
 };
 
+export type HelperDataDeployConfig = {
+  helperDataFactoryConfig: HelperDataFactoryConfig;
+};
+
 export type ReservedRMOConfig = {
   reservedTokensAmountPerAddress: bigint;
 };
@@ -49,4 +53,8 @@ export type SideChainSubscriptionManagerConfig = {
 export type CrosschainConfig = {
   subscriptionsSynchronizerConfig: ISubscriptionsSynchronizer.SubscriptionsSynchronizerInitDataStruct;
   subscriptionsStateReceiverConfig: ISubscriptionsStateReceiver.SubscriptionsStateReceiverInitDataStruct;
+};
+
+export type HelperDataFactoryConfig = {
+  helperDataManagers: string[];
 };
